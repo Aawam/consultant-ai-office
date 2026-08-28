@@ -59,12 +59,12 @@ No package may depend on office-web or ai-agent.
 
 - [x] Record technical decisions and implementation status.
 - [x] Perform code-quality review and fix material findings.
-- [ ] Commit the verified baseline and record the final commit hash in the handoff.
+- [x] Commit the verified baseline and record the baseline commit hash in the handoff.
 
 ### Checkpoint: Ready
 
-- [ ] Working tree is clean.
-- [ ] Handoff contains actual command evidence and readiness verdict.
+- [x] Working tree is clean after the documentation commit.
+- [x] Handoff contains actual command evidence and readiness verdict.
 
 ## Risks and Mitigations
 

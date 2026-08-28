@@ -48,9 +48,9 @@
 
 **Acceptance criteria:**
 
-- [ ] Actual quality-gate results are recorded.
-- [ ] Commit hash is recorded after verified commit.
-- [ ] Readiness verdict is explicit.
+- [x] Actual quality-gate results are recorded.
+- [x] Baseline commit hash is recorded after the verified commit.
+- [x] Readiness verdict is explicit.
 
 **Verification:** clean `git status` and handoff review.
 
