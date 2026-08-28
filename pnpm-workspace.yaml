@@ -1,0 +1,16 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Cycles undermine the modular-monolith dependency direction.
+disallowWorkspaceCycles: true
+linkWorkspacePackages: false
+saveWorkspaceProtocol: rolling
+
+# Installs are an explicit gate; quality commands must never auto-mutate deps.
+verifyDepsBeforeRun: false
+
+# Native build scripts are denied unless explicitly required by the toolchain.
+allowBuilds:
+  esbuild: true
+  unrs-resolver: true

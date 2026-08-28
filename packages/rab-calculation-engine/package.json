@@ -1,0 +1,17 @@
+{
+  "name": "@consultant-ai-office/rab-calculation-engine",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@consultant-ai-office/domain": "workspace:*",
+    "@consultant-ai-office/shared-contracts": "workspace:*",
+    "decimal.js": "10.6.0"
+  }
+}

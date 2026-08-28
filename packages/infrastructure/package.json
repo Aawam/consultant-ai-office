@@ -1,0 +1,21 @@
+{
+  "name": "@consultant-ai-office/infrastructure",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./postgres/schema": "./src/postgres/schema.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@consultant-ai-office/application": "workspace:*",
+    "@consultant-ai-office/domain": "workspace:*",
+    "@consultant-ai-office/shared-contracts": "workspace:*",
+    "dotenv": "17.4.2",
+    "drizzle-orm": "0.45.2",
+    "pg": "8.23.0"
+  }
+}

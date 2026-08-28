@@ -1,0 +1,37 @@
+{
+  "name": "consultant-ai-office",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.24.0",
+  "engines": {
+    "node": ">=22.0.0 <23",
+    "pnpm": ">=11.24.0 <12"
+  },
+  "scripts": {
+    "dev": "corepack pnpm@11.24.0 --filter @consultant-ai-office/office-web dev",
+    "lint": "eslint . --max-warnings=0 && node scripts/check-boundaries.mjs",
+    "typecheck": "corepack pnpm@11.24.0 -r --if-present typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build": "corepack pnpm@11.24.0 typecheck && corepack pnpm@11.24.0 --filter @consultant-ai-office/office-web build",
+    "start": "corepack pnpm@11.24.0 --filter @consultant-ai-office/office-web start",
+    "boundaries": "node scripts/check-boundaries.mjs",
+    "db:generate": "drizzle-kit generate --config packages/infrastructure/drizzle.config.ts",
+    "db:migrate": "drizzle-kit migrate --config packages/infrastructure/drizzle.config.ts",
+    "db:check": "drizzle-kit check --config packages/infrastructure/drizzle.config.ts",
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose down"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.1",
+    "@types/pg": "8.23.1",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.5",
+    "drizzle-kit": "0.31.10",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.3.3",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  }
+}

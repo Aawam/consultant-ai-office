@@ -1,0 +1,140 @@
+:root {
+  color-scheme: light;
+  --background: #f3f2ed;
+  --surface: #ffffff;
+  --text: #17201d;
+  --muted: #59635f;
+  --line: #cfd5d1;
+  --accent: #126046;
+  --accent-soft: #e1eee8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 20rem;
+  margin: 0;
+  background: var(--background);
+  color: var(--text);
+  font-family: Arial, Helvetica, sans-serif;
+  line-height: 1.5;
+}
+
+.shell {
+  width: min(100% - 2rem, 64rem);
+  margin-inline: auto;
+  padding-block: 4rem 2rem;
+}
+
+.intro {
+  max-width: 46rem;
+}
+
+.eyebrow {
+  margin: 0 0 0.75rem;
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  max-width: 14ch;
+  margin-bottom: 1rem;
+  font-size: clamp(2.5rem, 8vw, 5.5rem);
+  line-height: 0.95;
+  letter-spacing: -0.055em;
+}
+
+.lede {
+  max-width: 39rem;
+  margin-bottom: 1.5rem;
+  color: var(--muted);
+  font-size: clamp(1rem, 3vw, 1.25rem);
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #9ec6b5;
+  border-radius: 0.25rem;
+  background: var(--accent-soft);
+  color: #0b4934;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.status-mark {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.boundary {
+  margin-top: 4rem;
+  border-top: 1px solid var(--line);
+  padding-top: 1.5rem;
+}
+
+h2 {
+  font-size: 1rem;
+  letter-spacing: 0.01em;
+}
+
+ol {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: boundary;
+}
+
+li {
+  display: grid;
+  grid-template-columns: 2rem 1fr;
+  gap: 0.75rem;
+  align-items: start;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  counter-increment: boundary;
+}
+
+li::before {
+  color: var(--accent);
+  font-weight: 700;
+  content: "0" counter(boundary);
+}
+
+footer {
+  margin-top: 3rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+@media (min-width: 48rem) {
+  .shell {
+    padding-block: 6rem 3rem;
+  }
+
+  ol {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  li {
+    grid-template-columns: 1fr;
+    min-height: 9rem;
+  }
+}
