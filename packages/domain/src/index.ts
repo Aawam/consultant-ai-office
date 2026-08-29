@@ -34,3 +34,4 @@ export {
   type ProjectDraftInput,
   type ProjectMembership,
 } from "./project";
+export { type RabCalculationSnapshot, type RabItemInput, type RabValidationIssue, type RabValidationResult, type RabVersion } from "./rab";

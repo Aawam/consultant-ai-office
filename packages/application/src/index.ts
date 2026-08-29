@@ -54,3 +54,12 @@ export {
   type GetActiveProjectHistoryRequest,
   type GetActiveProjectHistoryResponse,
 } from "./project-history";
+export {
+  CreateRabDraftUseCase,
+  CreateRabRevisionUseCase,
+  FinalizeRabUseCase,
+  ReturnRabToDraftUseCase,
+  SubmitRabForReviewUseCase,
+  type CreateRabDraftRequest,
+} from "./rab-workflow";
+export { type OfficialHspSnapshot, type OfficialHspSnapshotPort, type RabPersistencePort, type RabTransactionPort, type RabUnitOfWork, type RabWorkflowRepository } from "./rab-ports";

@@ -15,6 +15,20 @@
       "when": 1787966185995,
       "tag": "0001_regular_dexter_bennett",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788000000000,
+      "tag": "0002_rab_workflow",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788000100000,
+      "tag": "0003_master_snapshots",
+      "breakpoints": true
     }
   ]
 }

@@ -141,10 +141,40 @@ export const auditEvents = officeSchema.table(
   ],
 );
 
+export const rabVersions = officeSchema.table(
+  "rab_versions",
+  {
+    rabVersionId: uuid("rab_version_id").primaryKey(),
+    projectId: uuid("project_id").notNull().references(() => projects.projectId, { onDelete: "restrict" }),
+    revisionOfRabVersionId: uuid("revision_of_rab_version_id"),
+    revisionNumber: varchar("revision_number", { length: 20 }).notNull(),
+    status: varchar("status", { length: 20 }).notNull(),
+    sourceData: jsonb("source_data").notNull(),
+    validationEvidence: jsonb("validation_evidence"),
+    calculationSnapshot: jsonb("calculation_snapshot"),
+    warningConfirmations: jsonb("warning_confirmations").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [index("rab_versions_project_idx").on(table.projectId, table.updatedAt)],
+);
+
+export const masterAhsps = officeSchema.table("master_ahsps", { ahspId: uuid("ahsp_id").primaryKey(), sourceEdition: varchar("source_edition", { length: 200 }).notNull(), officialCode: varchar("official_code", { length: 80 }).notNull(), officialDescription: varchar("official_description", { length: 500 }).notNull(), workUnitRaw: varchar("work_unit_raw", { length: 80 }).notNull(), workUnitCanonical: varchar("work_unit_canonical", { length: 80 }).notNull() }, (table) => [uniqueIndex("master_ahsps_edition_code_unique").on(table.sourceEdition, table.officialCode)]);
+export const resources = officeSchema.table("resources", { resourceId: uuid("resource_id").primaryKey(), resourceName: varchar("resource_name", { length: 300 }).notNull(), unitRawReference: varchar("unit_raw_reference", { length: 80 }).notNull(), unitCanonical: varchar("unit_canonical", { length: 80 }).notNull() });
+export const ahspComponents = officeSchema.table("ahsp_components", { ahspComponentId: uuid("ahsp_component_id").primaryKey(), ahspId: uuid("ahsp_id").notNull().references(() => masterAhsps.ahspId, { onDelete: "restrict" }), resourceId: uuid("resource_id").notNull().references(() => resources.resourceId, { onDelete: "restrict" }), componentGroup: varchar("component_group", { length: 20 }).notNull(), coefficient: varchar("coefficient", { length: 100 }).notNull(), sourceUnitRaw: varchar("source_unit_raw", { length: 80 }).notNull(), sourceUnitCanonical: varchar("source_unit_canonical", { length: 80 }).notNull(), resolutionState: varchar("resolution_state", { length: 20 }).notNull() });
+export const basePrices = officeSchema.table("base_prices", { resourceId: uuid("resource_id").primaryKey().references(() => resources.resourceId, { onDelete: "restrict" }), priceValue: varchar("price_value", { length: 100 }), priceState: varchar("price_state", { length: 20 }).notNull(), priceUnitRaw: varchar("price_unit_raw", { length: 80 }).notNull(), zeroIntent: varchar("zero_intent", { length: 500 }) });
+export const projectHspSnapshots = officeSchema.table("project_hsp_snapshots", { hspId: uuid("hsp_id").primaryKey(), projectId: uuid("project_id").notNull().references(() => projects.projectId, { onDelete: "restrict" }), ahspId: uuid("ahsp_id").notNull().references(() => masterAhsps.ahspId, { onDelete: "restrict" }), workUnitRaw: varchar("work_unit_raw", { length: 80 }).notNull(), componentSnapshot: jsonb("component_snapshot").notNull() });
+
 export const postgresSchema = {
   activeProjectContexts,
+  ahspComponents,
   auditEvents,
+  basePrices,
+  masterAhsps,
   projectMemberships,
   projects,
+  projectHspSnapshots,
+  rabVersions,
+  resources,
   toolExecutions,
 };
