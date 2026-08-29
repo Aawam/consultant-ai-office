@@ -67,6 +67,22 @@ export interface ExecutionHistoryPort {
   append(record: ExecutionRecordDraft): Promise<void>;
 }
 
+export interface ProjectHistoryQueryPort {
+  listExecutions(
+    projectId: string,
+    limit: number,
+  ): Promise<readonly ExecutionRecordDraft[]>;
+  listAuditEvents(
+    projectId: string,
+    limit: number,
+  ): Promise<readonly AuditRecordDraft[]>;
+}
+
+export interface ProjectHistoryDependencies {
+  readonly projects: ProjectQueryPort;
+  readonly history: ProjectHistoryQueryPort;
+}
+
 export interface ProjectUnitOfWork {
   readonly projects: ProjectRepository;
   readonly memberships: ProjectMembershipRepository;

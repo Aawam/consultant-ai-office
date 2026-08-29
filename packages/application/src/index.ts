@@ -28,6 +28,8 @@ export {
   type ExecutionResult,
   type IdGeneratorPort,
   type ProjectMembershipRepository,
+  type ProjectHistoryDependencies,
+  type ProjectHistoryQueryPort,
   type ProjectQueryPort,
   type ProjectRepository,
   type ProjectSelectionDependencies,
@@ -47,3 +49,8 @@ export {
   ListAccessibleProjectsUseCase,
   SelectActiveProjectUseCase,
 } from "./project-context";
+export {
+  GetActiveProjectHistoryUseCase,
+  type GetActiveProjectHistoryRequest,
+  type GetActiveProjectHistoryResponse,
+} from "./project-history";

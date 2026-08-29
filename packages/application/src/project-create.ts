@@ -37,7 +37,7 @@ export function previewProjectCreation(
     PROJECT_ROLES,
     "project.preview_create",
   );
-  const project = createProjectDraft(input);
+  const project = validateProjectDraft(input);
 
   return Object.freeze({
     project,
@@ -46,7 +46,21 @@ export function previewProjectCreation(
   });
 }
 
-export function cancelProjectCreation(previewFingerprint: string) {
+export function cancelProjectCreation(
+  context: RequestContext,
+  previewFingerprint: string,
+) {
+  if (context.actor.actorType !== "HUMAN") {
+    throw new ApplicationError(
+      "FORBIDDEN",
+      "Only a human actor can cancel a project creation preview",
+    );
+  }
+  RoleAuthorizationPolicy.assertAllowed(
+    context.actor,
+    PROJECT_ROLES,
+    "project.cancel_create",
+  );
   if (previewFingerprint.length === 0) {
     throw new ApplicationError(
       "VALIDATION_ERROR",
@@ -55,6 +69,19 @@ export function cancelProjectCreation(previewFingerprint: string) {
   }
 
   return Object.freeze({ state: "CANCELLED" as const, previewFingerprint });
+}
+
+function validateProjectDraft(input: ProjectDraftInput) {
+  try {
+    return createProjectDraft(input);
+  } catch (error) {
+    if (error instanceof DomainValidationError) {
+      throw new ApplicationError("VALIDATION_ERROR", error.message, {
+        issues: error.issues,
+      });
+    }
+    throw error;
+  }
 }
 
 export class CreateProjectUseCase {
@@ -70,17 +97,7 @@ export class CreateProjectUseCase {
       "project.create",
     );
 
-    let draft;
-    try {
-      draft = createProjectDraft(request.project);
-    } catch (error) {
-      if (error instanceof DomainValidationError) {
-        throw new ApplicationError("VALIDATION_ERROR", error.message, {
-          issues: error.issues,
-        });
-      }
-      throw error;
-    }
+    const draft = validateProjectDraft(request.project);
 
     const approvalReference = assertWriteApproved(
       context,

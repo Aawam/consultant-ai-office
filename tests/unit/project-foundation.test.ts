@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   ApplicationError,
   CreateProjectUseCase,
+  GetActiveProjectHistoryUseCase,
   RoleAuthorizationPolicy,
   cancelProjectCreation,
   previewProjectCreation,
@@ -117,7 +118,7 @@ describe("project write semantics", () => {
     expect(preview.previewFingerprint).toBe(
       "project.create|KC-01|Kantor Camat",
     );
-    expect(cancelProjectCreation(preview.previewFingerprint)).toEqual({
+    expect(cancelProjectCreation(technicalContext, preview.previewFingerprint)).toEqual({
       state: "CANCELLED",
       previewFingerprint: preview.previewFingerprint,
     });
@@ -249,5 +250,92 @@ describe("project write semantics", () => {
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
 
     expect(memory.counts().transactions).toBe(0);
+  });
+});
+
+describe("project history boundary", () => {
+  it("returns only history for the active, accessible project", async () => {
+    const history = new GetActiveProjectHistoryUseCase({
+      projects: {
+        listAccessible: async () => [],
+        hasAccess: async (actorId, projectId) =>
+          actorId === "technical-1" && projectId === "project-a",
+        getActive: async () => null,
+      },
+      history: {
+        listExecutions: async (projectId) => [
+          {
+            executionId: "execution-a",
+            requestId: "request-a",
+            projectId,
+            actorId: "technical-1",
+            actorType: "HUMAN",
+            actorRole: "TECHNICAL",
+            action: "project.create",
+            state: "SUCCEEDED",
+            startedAt: new Date("2026-08-29T01:00:00.000Z"),
+            completedAt: new Date("2026-08-29T01:00:00.000Z"),
+            approvalReference: null,
+            errorCode: null,
+          },
+        ],
+        listAuditEvents: async (projectId) => [
+          {
+            auditId: "audit-a",
+            eventName: "action.succeeded",
+            requestId: "request-a",
+            projectId,
+            actorId: "technical-1",
+            actorType: "HUMAN",
+            actorRole: "TECHNICAL",
+            action: "project.create",
+            result: "SUCCEEDED",
+            occurredAt: new Date("2026-08-29T01:00:00.000Z"),
+            approvalReference: null,
+            sanitizedSummary: {},
+          },
+        ],
+      },
+    });
+
+    const result = await history.execute(
+      { ...technicalContext, projectId: "project-a" },
+      { limit: 20 },
+    );
+
+    expect(result.projectId).toBe("project-a");
+    expect(result.executions).toHaveLength(1);
+    expect(result.auditEvents).toHaveLength(1);
+    expect(result.executions[0]?.projectId).toBe("project-a");
+    expect(result.auditEvents[0]?.projectId).toBe("project-a");
+  });
+
+  it("does not query history when active project membership is missing", async () => {
+    let historyQueries = 0;
+    const history = new GetActiveProjectHistoryUseCase({
+      projects: {
+        listAccessible: async () => [],
+        hasAccess: async () => false,
+        getActive: async () => null,
+      },
+      history: {
+        listExecutions: async () => {
+          historyQueries += 1;
+          return [];
+        },
+        listAuditEvents: async () => {
+          historyQueries += 1;
+          return [];
+        },
+      },
+    });
+
+    await expect(
+      history.execute(
+        { ...technicalContext, projectId: "project-b" },
+        { limit: 20 },
+      ),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(historyQueries).toBe(0);
   });
 });

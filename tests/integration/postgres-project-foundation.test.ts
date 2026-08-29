@@ -5,6 +5,7 @@ import {
   ApplicationError,
   CreateProjectUseCase,
   GetActiveProjectContextUseCase,
+  GetActiveProjectHistoryUseCase,
   ListAccessibleProjectsUseCase,
   SelectActiveProjectUseCase,
   type CreateProjectResponse,
@@ -122,6 +123,42 @@ describe("PostgreSQL project foundation vertical slice", () => {
     await expect(getActiveContext.execute(adminContext, {})).resolves.toMatchObject({
       projectId: projectB.project.projectId,
     });
+  });
+
+  it("reads execution and audit history only through active project membership", async () => {
+    const getHistory = new GetActiveProjectHistoryUseCase({
+      projects: runtime.queries,
+      history: runtime.history,
+    });
+
+    const result = await getHistory.execute(
+      { ...technicalContext, projectId: projectA.project.projectId },
+      { limit: 20 },
+    );
+
+    expect(result.projectId).toBe(projectA.project.projectId);
+    expect(result.executions).toEqual([
+      expect.objectContaining({
+        projectId: projectA.project.projectId,
+        actorId: technicalContext.actor.actorId,
+        action: "project.create",
+      }),
+    ]);
+    expect(result.auditEvents).toEqual([
+      expect.objectContaining({
+        projectId: projectA.project.projectId,
+        actorId: technicalContext.actor.actorId,
+        action: "project.create",
+        result: "SUCCEEDED",
+      }),
+    ]);
+
+    await expect(
+      getHistory.execute(
+        { ...technicalContext, projectId: projectB.project.projectId },
+        { limit: 20 },
+      ),
+    ).rejects.toMatchObject<ApplicationError>({ code: "FORBIDDEN" });
   });
 
   it("forbids inaccessible selection without any database mutation", async () => {

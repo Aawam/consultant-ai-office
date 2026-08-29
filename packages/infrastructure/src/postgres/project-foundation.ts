@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { drizzle, type NodePgQueryResultHKT } from "drizzle-orm/node-postgres";
 import type { PgDatabase } from "drizzle-orm/pg-core";
 import type { Pool } from "pg";
@@ -6,6 +6,9 @@ import type { Pool } from "pg";
 import {
   ApplicationError,
   type ApplicationErrorCode,
+  type AuditRecordDraft,
+  type ExecutionRecordDraft,
+  type ProjectHistoryQueryPort,
   type ProjectQueryPort,
   type ProjectUnitOfWork,
   type TransactionPort,
@@ -155,5 +158,40 @@ export function createPostgresProjectFoundation(options: { readonly pool: Pool }
     },
   };
 
-  return Object.freeze({ queries, transaction });
+  const history: ProjectHistoryQueryPort = {
+    listExecutions: async (projectId, limit) => {
+      const rows = await database
+        .select()
+        .from(toolExecutions)
+        .where(eq(toolExecutions.projectId, projectId))
+        .orderBy(desc(toolExecutions.startedAt))
+        .limit(limit);
+      return rows.map(
+        (row): ExecutionRecordDraft => ({
+          ...row,
+          actorType: row.actorType as ExecutionRecordDraft["actorType"],
+          actorRole: row.actorRole as ExecutionRecordDraft["actorRole"],
+          state: row.state as ExecutionRecordDraft["state"],
+        }),
+      );
+    },
+    listAuditEvents: async (projectId, limit) => {
+      const rows = await database
+        .select()
+        .from(auditEvents)
+        .where(eq(auditEvents.projectId, projectId))
+        .orderBy(desc(auditEvents.occurredAt))
+        .limit(limit);
+      return rows.map(
+        (row): AuditRecordDraft => ({
+          ...row,
+          actorType: row.actorType as AuditRecordDraft["actorType"],
+          actorRole: row.actorRole as AuditRecordDraft["actorRole"],
+          result: row.result as AuditRecordDraft["result"],
+        }),
+      );
+    },
+  };
+
+  return Object.freeze({ history, queries, transaction });
 }

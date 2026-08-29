@@ -70,6 +70,17 @@ technical operations needed to prove the Phase 0 architecture.
 - **Persistence ports:** membership repository, active-context repository,
   execution-history repository, audit repository.
 
+## `getActiveProjectHistory`
+
+- **Input:** active Project Context and a bounded result limit (1–100).
+- **Output:** execution records and audit events for that active project only.
+- **Actor:** `HUMAN` or `AI_AGENT` with an initial role.
+- **Authorization:** role allowlist plus membership in the active project.
+- **Domain invariant:** a project context is required; records from any other
+  project are never returned.
+- **Transaction/audit:** read-only; no transaction and no mutation audit.
+- **Persistence ports:** project membership query and project-history query.
+
 ## Failure semantics
 
 - Authorization and validation fail before business mutation.
