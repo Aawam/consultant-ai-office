@@ -15,6 +15,12 @@ export interface ProjectRepository {
   create(project: Project): Promise<void>;
 }
 
+export interface ProjectQueryPort {
+  listAccessible(actorId: string): Promise<readonly Project[]>;
+  hasAccess(actorId: string, projectId: string): Promise<boolean>;
+  getActive(actorId: string): Promise<ActiveProjectContext | null>;
+}
+
 export interface ProjectMembershipRepository {
   grant(membership: ProjectMembership): Promise<void>;
 }
@@ -81,4 +87,8 @@ export interface ProjectWriteDependencies {
   readonly transaction: TransactionPort;
   readonly clock: ClockPort;
   readonly ids: IdGeneratorPort;
+}
+
+export interface ProjectSelectionDependencies extends ProjectWriteDependencies {
+  readonly queries: ProjectQueryPort;
 }

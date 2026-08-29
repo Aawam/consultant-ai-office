@@ -8,6 +8,13 @@
       "when": 1787933078981,
       "tag": "0000_bootstrap",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1787966185995,
+      "tag": "0001_regular_dexter_bennett",
+      "breakpoints": true
     }
   ]
 }

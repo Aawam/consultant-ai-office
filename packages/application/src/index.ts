@@ -28,7 +28,9 @@ export {
   type ExecutionResult,
   type IdGeneratorPort,
   type ProjectMembershipRepository,
+  type ProjectQueryPort,
   type ProjectRepository,
+  type ProjectSelectionDependencies,
   type ProjectUnitOfWork,
   type ProjectWriteDependencies,
   type TransactionPort,
@@ -40,3 +42,8 @@ export {
   type CreateProjectRequest,
   type CreateProjectResponse,
 } from "./project-create";
+export {
+  GetActiveProjectContextUseCase,
+  ListAccessibleProjectsUseCase,
+  SelectActiveProjectUseCase,
+} from "./project-context";

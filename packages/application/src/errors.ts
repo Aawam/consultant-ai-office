@@ -4,6 +4,7 @@ export type ApplicationErrorCode =
   | "CONFLICT"
   | "FORBIDDEN"
   | "NOT_FOUND"
+  | "TRANSACTION_FAILED"
   | "VALIDATION_ERROR";
 
 export class ApplicationError extends Error {
