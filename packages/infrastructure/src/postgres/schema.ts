@@ -164,6 +164,7 @@ export const resources = officeSchema.table("resources", { resourceId: uuid("res
 export const ahspComponents = officeSchema.table("ahsp_components", { ahspComponentId: uuid("ahsp_component_id").primaryKey(), ahspId: uuid("ahsp_id").notNull().references(() => masterAhsps.ahspId, { onDelete: "restrict" }), resourceId: uuid("resource_id").notNull().references(() => resources.resourceId, { onDelete: "restrict" }), componentGroup: varchar("component_group", { length: 20 }).notNull(), coefficient: varchar("coefficient", { length: 100 }).notNull(), sourceUnitRaw: varchar("source_unit_raw", { length: 80 }).notNull(), sourceUnitCanonical: varchar("source_unit_canonical", { length: 80 }).notNull(), resolutionState: varchar("resolution_state", { length: 20 }).notNull() });
 export const basePrices = officeSchema.table("base_prices", { resourceId: uuid("resource_id").primaryKey().references(() => resources.resourceId, { onDelete: "restrict" }), priceValue: varchar("price_value", { length: 100 }), priceState: varchar("price_state", { length: 20 }).notNull(), priceUnitRaw: varchar("price_unit_raw", { length: 80 }).notNull(), zeroIntent: varchar("zero_intent", { length: 500 }) });
 export const projectHspSnapshots = officeSchema.table("project_hsp_snapshots", { hspId: uuid("hsp_id").primaryKey(), projectId: uuid("project_id").notNull().references(() => projects.projectId, { onDelete: "restrict" }), ahspId: uuid("ahsp_id").notNull().references(() => masterAhsps.ahspId, { onDelete: "restrict" }), workUnitRaw: varchar("work_unit_raw", { length: 80 }).notNull(), componentSnapshot: jsonb("component_snapshot").notNull() });
+export const exportArtifacts = officeSchema.table("export_artifacts", { artifactId: uuid("artifact_id").primaryKey(), projectId: uuid("project_id").notNull().references(() => projects.projectId, { onDelete: "restrict" }), rabVersionId: uuid("rab_version_id").notNull().references(() => rabVersions.rabVersionId, { onDelete: "restrict" }), snapshotId: varchar("snapshot_id", { length: 160 }).notNull(), exportType: varchar("export_type", { length: 20 }).notNull(), status: varchar("status", { length: 20 }).notNull(), generatedBy: varchar("generated_by", { length: 120 }).notNull(), generatedAt: timestamp("generated_at", { withTimezone: true }).notNull(), filePath: varchar("file_path", { length: 1000 }).notNull(), sha256: varchar("sha256", { length: 64 }).notNull() }, (table) => [index("export_artifacts_project_generated_idx").on(table.projectId, table.generatedAt)]);
 
 export const postgresSchema = {
   activeProjectContexts,
@@ -174,6 +175,7 @@ export const postgresSchema = {
   projectMemberships,
   projects,
   projectHspSnapshots,
+  exportArtifacts,
   rabVersions,
   resources,
   toolExecutions,

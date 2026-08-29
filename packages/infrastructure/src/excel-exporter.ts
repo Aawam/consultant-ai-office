@@ -8,7 +8,7 @@ import type {
   RabWorkbookExportInput,
   RabWorkbookExporterPort,
 } from "@consultant-ai-office/application";
-import type { RabItemInput } from "@consultant-ai-office/domain";
+import type { RabExportSnapshot, RabItemInput } from "@consultant-ai-office/domain";
 
 const SHEETS = ["PROJECT", "REKAP", "RAB_DETAIL", "BV", "HSP_USED", "AHSP_COMPONENTS", "RESOURCE_SNAPSHOT", "HSP_MAPPING", "CHECKS"] as const;
 const TABLES = ["tbl_PROJECT", "tbl_REKAP", "tbl_RAB", "tbl_BV", "tbl_HSP", "tbl_AHSP_COMP", "tbl_RESOURCE", "tbl_HSP_MAP", "tbl_CHECKS"] as const;
@@ -23,7 +23,7 @@ function header(sheet: ExcelJS.Worksheet, input: RabWorkbookExportInput): void {
   sheet.addRow(["Project", input.project.name, "Project ID", input.project.projectId]);
   sheet.addRow(["RAB Version", input.rab.rabVersionId, "Revision", input.rab.revisionNumber]);
   sheet.addRow(["Status", input.rab.status, "Export", input.exportType === "OFFICIAL" ? "OFFICIAL" : "NOT OFFICIAL"]);
-  sheet.addRow(["Snapshot ID", input.rab.calculationSnapshot ? input.rab.rabVersionId : "DRAFT-NO-SNAPSHOT", "Generated At", input.generatedAt.toISOString()]);
+  sheet.addRow(["Snapshot ID", input.snapshot.snapshotId, "Generated At", input.generatedAt.toISOString()]);
   sheet.getRows(1, 4)?.forEach((row) => row.eachCell((cell) => { cell.font = { bold: true }; }));
 }
 
@@ -48,42 +48,24 @@ function lockSheet(sheet: ExcelJS.Worksheet, input: RabWorkbookExportInput): voi
   }
 }
 
-function toHspRows(items: readonly RabItemInput[]): { hsp: Row[]; components: Row[]; resources: Row[] } {
-  const hsp = new Map<string, Row>(); const components: Row[] = []; const resources = new Map<string, Row>();
-  for (const raw of items) {
-    const item = itemData(raw); const source = item.hsp as Row | undefined; if (!source) continue;
-    const kind = text(source.kind).includes("MANUAL") ? "MANUAL" : "AHSP";
-    const hspId = text(item.hspId) || `hsp-${text(item.itemId)}`;
-    if (hsp.has(hspId)) continue;
-    const unitRaw = text(source.unitRaw);
-    const row: Row = { hsp_id: hspId, hsp_type: kind, ahsp_id: kind === "AHSP" ? text(item.ahspId) || "ahsp-unknown" : "", source_edition: text(item.sourceEdition), official_code: text(item.officialCode), official_description: text(item.description), source_locator: text(item.sourceLocator), work_unit_raw: unitRaw, work_unit_canonical: canonicalUnit(unitRaw), manual_description: kind === "MANUAL" ? text(source.description) || text(item.description) : "", manual_hsp: kind === "MANUAL" ? text(source.manualHsp) : "", manual_note: kind === "MANUAL" ? text(source.note) : "", labor_subtotal: formula(`SUMIFS(tbl_AHSP_COMP[component_cost],tbl_AHSP_COMP[hsp_id],[@hsp_id],tbl_AHSP_COMP[component_group],"TENAGA")`), material_subtotal: formula(`SUMIFS(tbl_AHSP_COMP[component_cost],tbl_AHSP_COMP[hsp_id],[@hsp_id],tbl_AHSP_COMP[component_group],"BAHAN")`), equipment_subtotal: formula(`SUMIFS(tbl_AHSP_COMP[component_cost],tbl_AHSP_COMP[hsp_id],[@hsp_id],tbl_AHSP_COMP[component_group],"ALAT")`), direct_cost: formula("=[@labor_subtotal]+[@material_subtotal]+[@equipment_subtotal]"), oh_rate: formula('=IF([@hsp_type]="AHSP",P_OH_RATE,0)'), oh_value: formula("=[@direct_cost]*[@oh_rate]"), hsp_value: kind === "MANUAL" ? text(source.manualHsp) : formula('=IF([@hsp_type]="MANUAL",[@manual_hsp],[@direct_cost]+[@oh_value])') };
-    hsp.set(hspId, row);
-    const sourceComponents = (source.components as readonly Row[] | undefined) ?? [];
-    sourceComponents.forEach((component, index) => {
-      const resourceId = text(component.resourceId) || `resource-${hspId}-${index + 1}`;
-      const basePrice = (component.basePrice ?? {}) as Row;
-      const price = text(basePrice.priceValue ?? component.priceValue);
-      const priceState = text(basePrice.priceState ?? component.priceState) || "MISSING";
-      const priceUnit = text(basePrice.priceUnitRaw ?? component.priceUnit);
-      const componentCost = "";
-      components.push({ ahsp_component_id: text(component.ahspComponentId) || text(component.componentId) || `${hspId}-component-${index + 1}`, ahsp_id: text(row.ahsp_id), hsp_id: hspId, source_order: index + 1, component_group: text(component.group) || "BAHAN", source_resource_name: text(component.resourceName) || text(component.resourceUnitRaw), source_resource_code: text(component.resourceCode), source_unit_raw: text(component.resourceUnitRaw), source_unit_canonical: canonicalUnit(text(component.resourceUnitRaw)), resource_id: resourceId, coefficient: text(component.coefficient), price_unit: priceUnit, price_value: price, price_state: priceState, component_cost: formula("=[@coefficient]*[@price_value]", componentCost), source_locator: text(component.sourceLocator) });
-      resources.set(resourceId, { resource_id: resourceId, resource_type: text(component.group), normative_code: text(component.normativeCode), resource_name: text(component.resourceName) || text(component.resourceUnitRaw), unit_raw_reference: text(component.resourceUnitRaw), unit_canonical: canonicalUnit(text(component.resourceUnitRaw)), price_unit: priceUnit, price_value: price, price_state: priceState, snapshot_id: "" });
-    });
-  }
-  return { hsp: [...hsp.values()], components, resources: [...resources.values()] };
+function toHspRows(snapshot: RabExportSnapshot): { hsp: Row[]; components: Row[]; resources: Row[] } {
+  const hsp = snapshot.hspSnapshots.map((source) => ({ hsp_id: source.hspId, hsp_type: source.hspType, ahsp_id: source.ahspId ?? "", source_edition: source.sourceEdition ?? "", official_code: source.officialCode ?? "", official_description: source.officialDescription ?? "", source_locator: source.sourceLocator ?? "", work_unit_raw: source.workUnitRaw, work_unit_canonical: source.workUnitCanonical, manual_description: source.manualDescription ?? "", manual_hsp: source.manualHsp ?? "", manual_note: source.manualNote ?? "", labor_subtotal: formula('SUMIFS(tbl_AHSP_COMP[component_cost],tbl_AHSP_COMP[hsp_id],[@hsp_id],tbl_AHSP_COMP[component_group],"TENAGA")'), material_subtotal: formula('SUMIFS(tbl_AHSP_COMP[component_cost],tbl_AHSP_COMP[hsp_id],[@hsp_id],tbl_AHSP_COMP[component_group],"BAHAN")'), equipment_subtotal: formula('SUMIFS(tbl_AHSP_COMP[component_cost],tbl_AHSP_COMP[hsp_id],[@hsp_id],tbl_AHSP_COMP[component_group],"ALAT")'), direct_cost: formula('=[@labor_subtotal]+[@material_subtotal]+[@equipment_subtotal]'), oh_rate: formula('=IF([@hsp_type]="AHSP",P_OH_RATE,0)'), oh_value: formula('=[@direct_cost]*[@oh_rate]'), hsp_value: source.hspType === "MANUAL" ? source.manualHsp ?? "" : formula('=IF([@hsp_type]="MANUAL",[@manual_hsp],[@direct_cost]+[@oh_value])') }));
+  const components = snapshot.componentSnapshots.map((source) => ({ ahsp_component_id: source.ahspComponentId, ahsp_id: source.ahspId, hsp_id: source.hspId, source_order: source.sourceOrder, component_group: source.componentGroup, source_resource_name: source.sourceResourceName, source_resource_code: source.sourceResourceCode ?? "", source_unit_raw: source.sourceUnitRaw, source_unit_canonical: source.sourceUnitCanonical, resource_id: source.resourceId, coefficient: source.coefficient, price_unit: source.priceUnit, price_value: source.priceValue ?? "", price_state: source.priceState, component_cost: formula('=[@coefficient]*[@price_value]'), source_locator: source.sourceLocator ?? "" }));
+  const resources = snapshot.resourceSnapshots.map((source) => ({ resource_id: source.resourceId, resource_type: source.resourceType, normative_code: source.normativeCode ?? "", resource_name: source.resourceName, unit_raw_reference: source.unitRawReference, unit_canonical: source.unitCanonical, price_unit: source.priceUnit, price_value: source.priceValue ?? "", price_state: source.priceState, snapshot_id: snapshot.snapshotId }));
+  return { hsp, components, resources };
 }
 
 export class ExcelJsRabWorkbookExporter implements RabWorkbookExporterPort {
   async build(input: RabWorkbookExportInput): Promise<Uint8Array> {
     const workbook = new ExcelJS.Workbook(); workbook.creator = "Consultant AI Office"; workbook.created = input.generatedAt; workbook.modified = input.generatedAt;
     const sheets = Object.fromEntries(SHEETS.map((name) => [name, workbook.addWorksheet(name)])) as Record<typeof SHEETS[number], ExcelJS.Worksheet>;
-    const { hsp, components, resources } = toHspRows(input.rab.items);
+    const { hsp, components, resources } = toHspRows(input.snapshot);
     header(sheets.PROJECT, input);
     addTable(sheets.PROJECT, TABLES[0], ["field", "value"], [{ field: "project_id", value: input.project.projectId }, { field: "project_name", value: input.project.name }, { field: "status", value: input.rab.status }, { field: "snapshot_id", value: input.rab.calculationSnapshot ? input.rab.rabVersionId : "" }, { field: "oh_profit_rate", value: input.rab.ohProfitRate }, { field: "ppn_rate", value: input.rab.ppnRate }, { field: "rounding_unit", value: 1000 }, { field: "rounding_method", value: "HALF_UP" }, { field: "currency", value: "IDR" }, { field: "excel_contract_version", value: "12" }]);
     workbook.definedNames.add("PROJECT!$B$7", "P_PROJECT_ID"); workbook.definedNames.add("PROJECT!$B$9", "P_STATUS"); workbook.definedNames.add("PROJECT!$B$11", "P_OH_RATE"); workbook.definedNames.add("PROJECT!$B$12", "P_PPN_RATE"); workbook.definedNames.add("PROJECT!$B$13", "P_ROUND_UNIT");
     const hspByItem = new Map<string, string>(); input.rab.items.forEach((raw) => { const item = itemData(raw); hspByItem.set(text(item.itemId), text(item.hspId) || `hsp-${text(item.itemId)}`); });
     addTable(sheets.RAB_DETAIL, TABLES[2], ["item_id", "item_order", "item_name", "group_id", "group_name", "subgroup_id", "subgroup_name", "volume_unit_raw", "volume_unit_canonical", "volume_source_type", "bv_id", "direct_volume", "direct_basis", "direct_source", "direct_note", "direct_reviewer", "volume", "hsp_id", "hsp_type", "hsp_unit_canonical", "unit_check", "hsp_value", "item_amount", "warning_code", "error_code"], input.rab.items.map((raw, index) => { const item = itemData(raw); const source = item.volumeSource as Row | undefined; const sourceType = text(source?.kind).includes("BACKUP") ? "BV" : "DIRECT"; const unitRaw = text(item.volumeUnitRaw); const hspId = hspByItem.get(text(item.itemId))!; const hspSource = item.hsp as Row; return { item_id: text(item.itemId), item_order: index + 1, item_name: text(item.description), group_id: text(item.groupId) || "GROUP-1", group_name: text(item.groupName) || "Ungrouped", subgroup_id: text(item.subgroupId), subgroup_name: text(item.subgroupName), volume_unit_raw: unitRaw, volume_unit_canonical: canonicalUnit(unitRaw), volume_source_type: sourceType, bv_id: text(source?.bvReferenceId), direct_volume: sourceType === "DIRECT" ? text(item.volume) : "", direct_basis: text(source?.basis), direct_source: text(source?.source), direct_note: text(source?.note), direct_reviewer: text(source?.reviewerId), volume: sourceType === "DIRECT" ? text(item.volume) : formula('=SUMIFS(tbl_BV[volume_calc],tbl_BV[bv_id],[@bv_id],tbl_BV[is_result],TRUE)'), hsp_id: hspId, hsp_type: text(hspSource?.kind).includes("MANUAL") ? "MANUAL" : "AHSP", hsp_unit_canonical: canonicalUnit(text(hspSource?.unitRaw)), unit_check: formula('=IF([@volume_unit_canonical]=[@hsp_unit_canonical],"OK","ERROR")'), hsp_value: formula("=INDEX(tbl_HSP[hsp_value],MATCH([@hsp_id],tbl_HSP[hsp_id],0))"), item_amount: formula("=[@volume]*[@hsp_value]"), warning_code: sourceType === "DIRECT" ? "DIRECT_VOLUME_REVIEW_REQUIRED" : text(hspSource?.kind).includes("MANUAL") ? "MANUAL_HSP_REVIEW_REQUIRED" : "", error_code: "" }; }));
-    addTable(sheets.BV, TABLES[3], ["bv_id", "bv_line_id", "rab_item_id", "line_order", "line_role", "description", "formula_template_key", "formula_template_version", "formula_display", "unit_raw", "unit_canonical", "volume_calc", "is_result", "dimension_source", "note"], []);
+    addTable(sheets.BV, TABLES[3], ["bv_id", "bv_line_id", "rab_item_id", "line_order", "line_role", "description", "formula_template_key", "formula_template_version", "formula_display", "unit_raw", "unit_canonical", "volume_calc", "is_result", "dimension_source", "note"], input.snapshot.bvLines.map((line) => ({ bv_id: line.bvId, bv_line_id: line.bvLineId, rab_item_id: line.rabItemId, line_order: line.lineOrder, line_role: line.lineRole, description: line.description, formula_template_key: line.formulaTemplateKey, formula_template_version: line.formulaTemplateVersion, formula_display: line.formulaDisplay, unit_raw: line.unitRaw, unit_canonical: line.unitCanonical, volume_calc: formula(`=${line.volumeCalc}`, line.volumeCalc), is_result: line.isResult, dimension_source: line.dimensionSource, note: line.note ?? "" })));
     addTable(sheets.HSP_USED, TABLES[4], Object.keys(hsp[0] ?? { hsp_id: "" }), hsp);
     addTable(sheets.AHSP_COMPONENTS, TABLES[5], Object.keys(components[0] ?? { ahsp_component_id: "" }), components);
     addTable(sheets.RESOURCE_SNAPSHOT, TABLES[6], Object.keys(resources[0] ?? { resource_id: "" }), resources);

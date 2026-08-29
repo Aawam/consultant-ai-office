@@ -16,7 +16,7 @@ import {
   createPostgresProjectFoundation,
   createPostgresRabWorkflow,
   ExcelJsRabWorkbookExporter,
-  FileArtifactStorage,
+  PostgresArtifactStorage,
 } from "@consultant-ai-office/infrastructure";
 import { ExportRabExcelUseCase } from "@consultant-ai-office/application";
 import { Pool } from "pg";
@@ -77,7 +77,7 @@ export function createOfficeRuntime(options: OfficeRuntimeOptions): OfficeRuntim
       returnToDraft: new ReturnRabToDraftUseCase(rabAdapters.rabs, rabAdapters.transaction, clock),
       finalize: new FinalizeRabUseCase(rabAdapters.rabs, rabAdapters.transaction, clock),
       createRevision: new CreateRabRevisionUseCase(rabAdapters.rabs, rabAdapters.transaction, clock, ids),
-      exportExcel: new ExportRabExcelUseCase({ rabs: rabAdapters.rabs, projects: projectAdapters.exportSource, exporter: new ExcelJsRabWorkbookExporter(), artifacts: new FileArtifactStorage(options.artifactRoot ?? "storage/artifacts"), clock, ids }),
+      exportExcel: new ExportRabExcelUseCase({ rabs: rabAdapters.rabs, projects: projectAdapters.exportSource, exporter: new ExcelJsRabWorkbookExporter(), artifacts: new PostgresArtifactStorage(pool, options.artifactRoot ?? "storage/artifacts"), clock, ids }),
     },
     close: () => pool.end(),
   });

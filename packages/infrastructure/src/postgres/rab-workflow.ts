@@ -41,7 +41,12 @@ export function createPostgresOfficialHspSnapshots(options: { readonly pool: Poo
         await tx.insert(basePrices).values({ resourceId: component.resourceId, ...component.basePrice });
         await tx.insert(ahspComponents).values({ ahspComponentId: component.ahspComponentId, ahspId: snapshot.ahspId, resourceId: component.resourceId, componentGroup: component.group, coefficient: component.coefficient, sourceUnitRaw: component.resourceUnitRaw, sourceUnitCanonical: component.resourceUnitCanonical, resolutionState: component.resolutionState });
       }
-      await tx.insert(projectHspSnapshots).values({ hspId: snapshot.hspId, projectId: snapshot.projectId, ahspId: snapshot.ahspId, workUnitRaw: snapshot.workUnitRaw, componentSnapshot: snapshot.components });
+      const components = snapshot.components.map((component, index) => {
+        const identity = snapshot.componentsWithIdentity[index];
+        if (!identity) throw new Error("Official HSP component identity is required for snapshot persistence");
+        return { ...component, ahspComponentId: identity.ahspComponentId, resourceId: identity.resourceId, resourceName: identity.resourceName, resourceUnitCanonical: identity.resourceUnitCanonical, sourceLocator: `${snapshot.sourceEdition}#${snapshot.officialCode}#${identity.ahspComponentId}` };
+      });
+      await tx.insert(projectHspSnapshots).values({ hspId: snapshot.hspId, projectId: snapshot.projectId, ahspId: snapshot.ahspId, workUnitRaw: snapshot.workUnitRaw, componentSnapshot: components });
     }),
     resolve: async (hspId) => { const row = (await database.select().from(projectHspSnapshots).where(eq(projectHspSnapshots.hspId, hspId)).limit(1))[0]; return row ? { hspId: row.hspId, ahspId: row.ahspId, workUnitRaw: row.workUnitRaw, components: row.componentSnapshot as OfficialHspSnapshot["components"] } : null; },
   };

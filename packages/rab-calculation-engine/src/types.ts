@@ -25,6 +25,12 @@ export interface AhspComponentInput {
   readonly resourceUnitRaw: string;
   readonly resolutionState: ResolutionState;
   readonly basePrice: BasePriceInput;
+  readonly ahspComponentId?: string;
+  readonly resourceId?: string;
+  readonly resourceName?: string;
+  readonly resourceCode?: string | null;
+  readonly resourceUnitCanonical?: string;
+  readonly sourceLocator?: string | null;
 }
 
 export interface ComponentCostResult {

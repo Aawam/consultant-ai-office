@@ -4,6 +4,7 @@ import { RoleAuthorizationPolicy } from "./authorization";
 import { ApplicationError } from "./errors";
 import type { IdGeneratorPort } from "./project-ports";
 import type { OfficialHspSnapshotPort, RabTransactionPort, RabWorkflowRepository } from "./rab-ports";
+import { buildRabExportSnapshot } from "./rab-export";
 export type ProjectRabItemInput = RabItemReviewInput & { readonly hspId?: string };
 export interface CreateRabDraftRequest { readonly title: string; readonly ohProfitRate: string; readonly ppnRate: string; readonly items: readonly ProjectRabItemInput[]; }
 
@@ -19,7 +20,7 @@ function calculateSnapshot(rab: RabVersion, calculatedAt: Date) {
     return calculated.itemValue;
   });
   const totals = calculateProjectTotals({ groupSubtotals: values, ppnRate: rab.ppnRate });
-  return { calculatedAt, itemValues, totals: { subtotalRab: totals.subtotalRab, ppnValue: totals.ppnValue, totalBeforeRounding: totals.totalBeforeRounding, totalFinal: totals.totalFinal, roundingDifference: totals.roundingDifference } };
+  return { calculatedAt, itemValues, totals: { subtotalRab: totals.subtotalRab, ppnValue: totals.ppnValue, totalBeforeRounding: totals.totalBeforeRounding, totalFinal: totals.totalFinal, roundingDifference: totals.roundingDifference }, exportSnapshot: buildRabExportSnapshot(rab, `${rab.rabVersionId}-snapshot`) };
 }
 
 function auditMutation(context: RequestContext, rab: RabVersion, action: string, occurredAt: Date, unitOfWork: import("./rab-ports").RabUnitOfWork): Promise<void> {

@@ -3,3 +3,4 @@ export { createPostgresOfficialHspSnapshots, createPostgresRabWorkflow, type Off
 export { officeSchema, postgresSchema } from "./postgres/schema";
 export { createDisabledAIProvider } from "./ai/disabled-provider";
 export { ExcelJsRabWorkbookExporter, FileArtifactStorage } from "./excel-exporter";
+export { PostgresArtifactStorage } from "./postgres/artifacts";

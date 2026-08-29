@@ -1,4 +1,4 @@
-import type { Project, RabVersion, RequestContext } from "@consultant-ai-office/domain";
+import type { Project, RabExportSnapshot, RabVersion, RequestContext } from "@consultant-ai-office/domain";
 
 export type RabExportType = "WORKING" | "OFFICIAL";
 
@@ -12,6 +12,7 @@ export interface RabWorkbookExportInput {
   readonly exportType: RabExportType;
   readonly artifactId: string;
   readonly generatedAt: Date;
+  readonly snapshot: RabExportSnapshot;
 }
 
 export interface RabWorkbookExporterPort {
@@ -22,6 +23,7 @@ export interface ArtifactRecord {
   readonly artifactId: string;
   readonly projectId: string;
   readonly rabVersionId: string;
+  readonly snapshotId: string;
   readonly exportType: RabExportType;
   readonly status: RabVersion["status"];
   readonly generatedBy: string;
