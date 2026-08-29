@@ -33,3 +33,17 @@ export interface ControlledToolContract {
   readonly idempotencyPolicy: string;
   readonly timeoutPolicy: string;
 }
+
+export interface AICompletionRequest {
+  readonly requestId: string;
+  readonly prompt: string;
+}
+
+export type AICompletionResult =
+  | { readonly state: "COMPLETED"; readonly output: string }
+  | { readonly state: "DISABLED"; readonly output: null };
+
+export interface AIProviderPort {
+  isEnabled(): boolean;
+  complete(request: AICompletionRequest): Promise<AICompletionResult>;
+}

@@ -29,7 +29,15 @@ export function assertWriteApproved(
   project: ProjectDraft,
   initiation: WriteInitiation,
 ): string | null {
-  if (initiation.kind === "HUMAN_DIRECT") return null;
+  if (initiation.kind === "HUMAN_DIRECT") {
+    if (context.actor.actorType !== "HUMAN") {
+      throw new ApplicationError(
+        "APPROVAL_REQUIRED",
+        "Only a human actor may use the direct write path",
+      );
+    }
+    return null;
+  }
 
   const confirmation = initiation.confirmation;
   if (!confirmation || confirmation.confirmedBy.actorType !== "HUMAN") {

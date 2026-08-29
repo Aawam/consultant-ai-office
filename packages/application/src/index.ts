@@ -1,4 +1,4 @@
-export type { RequestContext } from "@consultant-ai-office/domain";
+export type { ActorIdentity, RequestContext } from "@consultant-ai-office/domain";
 export type {
   ActorRole,
   ActorType,

@@ -168,6 +168,29 @@ describe("project write semantics", () => {
     });
   });
 
+  it("prevents an AI actor from claiming the human-direct write path", async () => {
+    const memory = createMemoryTransaction();
+    const useCase = new CreateProjectUseCase({
+      transaction: memory.transaction,
+      clock: { now: () => new Date("2026-08-29T01:00:00.000Z") },
+      ids: { next: () => "00000000-0000-4000-8000-000000000001" },
+    });
+
+    await expect(
+      useCase.execute(
+        {
+          ...technicalContext,
+          actor: { ...technicalContext.actor, actorType: "AI_AGENT" },
+        },
+        {
+          project: { name: "Kantor Camat", code: "KC-01" },
+          initiation: { kind: "HUMAN_DIRECT" },
+        },
+      ),
+    ).rejects.toMatchObject({ code: "APPROVAL_REQUIRED" });
+    expect(memory.counts().transactions).toBe(0);
+  });
+
   it("creates project, membership, context, execution, and audit atomically", async () => {
     const memory = createMemoryTransaction();
     let idSequence = 0;
