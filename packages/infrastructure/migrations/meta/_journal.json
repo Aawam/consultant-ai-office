@@ -29,6 +29,13 @@
       "when": 1788000100000,
       "tag": "0003_master_snapshots",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788005565142,
+      "tag": "0004_export_artifacts",
+      "breakpoints": true
     }
   ]
 }
