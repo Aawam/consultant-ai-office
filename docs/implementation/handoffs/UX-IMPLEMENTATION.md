@@ -1,7 +1,7 @@
 # UX Implementation Handoff — Phase 0–1
 
 **Workstream:** UX Implementation Engineer
-**Status:** READY FOR EXCEL EXPORTER
+**Status:** NOT READY — UX IMPLEMENTATION BLOCKERS REMAIN
 
 ## 1. Authority and baseline
 
@@ -128,4 +128,4 @@ Excel/PDF output implementation, Phase 2–5 features, arbitrary formula editing
 
 Implementation commit: `14f2bc2` (`feat: add application composition runtime`). The composition-root and integration gates are green. Excel exporter was not started.
 
-**READY FOR EXCEL EXPORTER**
+**NOT READY — UX IMPLEMENTATION BLOCKERS REMAIN**
