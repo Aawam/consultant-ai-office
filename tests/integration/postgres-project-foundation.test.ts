@@ -11,6 +11,7 @@ import {
 } from "@consultant-ai-office/application";
 import type { RequestContext } from "@consultant-ai-office/domain";
 import { createPostgresProjectFoundation } from "@consultant-ai-office/infrastructure";
+import { createProjectDelivery } from "../../apps/office-web/app/project-delivery";
 
 const connectionString = process.env.TEST_DATABASE_URL;
 if (!connectionString) {
@@ -60,10 +61,15 @@ describe("PostgreSQL project foundation vertical slice", () => {
       "TRUNCATE office.audit_events, office.tool_executions, office.active_project_contexts, office.project_memberships, office.projects CASCADE",
     );
     const createProject = new CreateProjectUseCase(dependencies);
-    projectA = await createProject.execute(technicalContext, {
-      project: { name: "Project A", code: "P0-A" },
-      initiation: { kind: "HUMAN_DIRECT" },
+    const delivery = createProjectDelivery({ createProject });
+    const deliveredProjectA = await delivery.createProject(technicalContext, {
+      name: "Project A",
+      code: "P0-A",
     });
+    if (!deliveredProjectA.ok) {
+      throw new Error(`Delivery setup failed: ${deliveredProjectA.error.code}`);
+    }
+    projectA = deliveredProjectA.data;
     projectB = await createProject.execute(adminContext, {
       project: { name: "Project B", code: "P0-B" },
       initiation: { kind: "HUMAN_DIRECT" },
