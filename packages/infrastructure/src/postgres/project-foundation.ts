@@ -9,6 +9,7 @@ import {
   type AuditRecordDraft,
   type ExecutionRecordDraft,
   type ProjectHistoryQueryPort,
+  type ProjectExportSource,
   type ProjectQueryPort,
   type ProjectUnitOfWork,
   type TransactionPort,
@@ -158,6 +159,30 @@ export function createPostgresProjectFoundation(options: { readonly pool: Pool }
     },
   };
 
+  const exportSource: ProjectExportSource = {
+    get: async (projectId, actorId) => {
+      const rows = await database
+        .select({
+          projectId: projects.projectId,
+          code: projects.code,
+          name: projects.name,
+          createdBy: projects.createdBy,
+          createdAt: projects.createdAt,
+        })
+        .from(projects)
+        .innerJoin(
+          projectMemberships,
+          and(
+            eq(projectMemberships.projectId, projects.projectId),
+            eq(projectMemberships.actorId, actorId),
+          ),
+        )
+        .where(eq(projects.projectId, projectId))
+        .limit(1);
+      return rows[0] ?? null;
+    },
+  };
+
   const history: ProjectHistoryQueryPort = {
     listExecutions: async (projectId, limit) => {
       const rows = await database
@@ -193,5 +218,5 @@ export function createPostgresProjectFoundation(options: { readonly pool: Pool }
     },
   };
 
-  return Object.freeze({ history, queries, transaction });
+  return Object.freeze({ exportSource, history, queries, transaction });
 }

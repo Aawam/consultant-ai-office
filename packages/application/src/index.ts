@@ -63,3 +63,5 @@ export {
   type CreateRabDraftRequest,
 } from "./rab-workflow";
 export { type OfficialHspSnapshot, type OfficialHspSnapshotPort, type RabPersistencePort, type RabTransactionPort, type RabUnitOfWork, type RabWorkflowRepository } from "./rab-ports";
+export { ExportRabExcelUseCase } from "./rab-export";
+export type { ArtifactRecord, ArtifactStoragePort, ExportRabDependencies, ExportRabRequest, ExportRabResponse, ProjectExportSource, RabExportType, RabWorkbookExportInput, RabWorkbookExporterPort, RabExporterUseCase } from "./export-ports";

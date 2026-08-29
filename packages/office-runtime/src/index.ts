@@ -15,7 +15,10 @@ import {
   createPostgresOfficialHspSnapshots,
   createPostgresProjectFoundation,
   createPostgresRabWorkflow,
+  ExcelJsRabWorkbookExporter,
+  FileArtifactStorage,
 } from "@consultant-ai-office/infrastructure";
+import { ExportRabExcelUseCase } from "@consultant-ai-office/application";
 import { Pool } from "pg";
 
 export interface OfficeRuntimeOptions {
@@ -23,6 +26,7 @@ export interface OfficeRuntimeOptions {
   readonly clock?: ClockPort;
   readonly ids?: { readonly next: () => string };
   readonly maxConnections?: number;
+  readonly artifactRoot?: string;
 }
 
 export interface OfficeRuntime {
@@ -41,6 +45,7 @@ export interface OfficeRuntime {
     readonly returnToDraft: ReturnRabToDraftUseCase;
     readonly finalize: FinalizeRabUseCase;
     readonly createRevision: CreateRabRevisionUseCase;
+    readonly exportExcel: ExportRabExcelUseCase;
   };
   readonly close: () => Promise<void>;
 }
@@ -72,6 +77,7 @@ export function createOfficeRuntime(options: OfficeRuntimeOptions): OfficeRuntim
       returnToDraft: new ReturnRabToDraftUseCase(rabAdapters.rabs, rabAdapters.transaction, clock),
       finalize: new FinalizeRabUseCase(rabAdapters.rabs, rabAdapters.transaction, clock),
       createRevision: new CreateRabRevisionUseCase(rabAdapters.rabs, rabAdapters.transaction, clock, ids),
+      exportExcel: new ExportRabExcelUseCase({ rabs: rabAdapters.rabs, projects: projectAdapters.exportSource, exporter: new ExcelJsRabWorkbookExporter(), artifacts: new FileArtifactStorage(options.artifactRoot ?? "storage/artifacts"), clock, ids }),
     },
     close: () => pool.end(),
   });
@@ -80,7 +86,7 @@ export function createOfficeRuntime(options: OfficeRuntimeOptions): OfficeRuntim
 export function createOfficeRuntimeFromEnv(env: NodeJS.ProcessEnv = process.env): OfficeRuntime {
   const connectionString = env.DATABASE_URL ?? env.TEST_DATABASE_URL;
   if (!connectionString) throw new Error("DATABASE_URL or TEST_DATABASE_URL is required to create OfficeRuntime");
-  return createOfficeRuntime({ connectionString });
+  return createOfficeRuntime({ connectionString, ...(env.OFFICE_ARTIFACT_ROOT ? { artifactRoot: env.OFFICE_ARTIFACT_ROOT } : {}) });
 }
 
 export type { RequestContext };

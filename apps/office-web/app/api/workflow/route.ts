@@ -41,7 +41,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json() as { action?: string; projectId?: string; rabVersionId?: string; title?: string; code?: string; name?: string };
+    const body = await request.json() as { action?: string; projectId?: string; rabVersionId?: string; title?: string; code?: string; name?: string; exportType?: "WORKING" | "OFFICIAL" };
     const runtime = runtimeForRequest();
     if (body.action === "create_project") {
       const result = await runtime.projects.create.execute(context(request, null, "browser-project-create"), { project: { name: body.name ?? body.title ?? "", code: body.code ?? "" }, initiation: { kind: "HUMAN_DIRECT" } });
@@ -62,6 +62,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, data: draft }, { status: 201 });
     }
     if (!body.rabVersionId) return NextResponse.json({ ok: false, error: { code: "VALIDATION_ERROR", message: "rabVersionId is required" } }, { status: 422 });
+    if (body.action === "export_excel") {
+      const result = await runtime.rab.exportExcel.execute(context(request, body.projectId, "browser-rab-export"), { rabVersionId: body.rabVersionId, exportType: body.exportType ?? "WORKING" });
+      return NextResponse.json({ ok: true, data: { artifact: result.artifact, bytesBase64: Buffer.from(result.bytes).toString("base64") } });
+    }
     if (body.action === "submit_review") return NextResponse.json({ ok: true, data: await runtime.rab.submitReview.execute(context(request, body.projectId, "browser-rab-review"), { rabVersionId: body.rabVersionId }) });
     if (body.action === "finalize") return NextResponse.json({ ok: true, data: await runtime.rab.finalize.execute(context(request, body.projectId, "browser-rab-finalize"), { rabVersionId: body.rabVersionId, confirmedWarningCodes: ["DIRECT_VOLUME_REVIEW_REQUIRED", "MANUAL_HSP_REVIEW_REQUIRED"] }) });
     if (body.action === "create_revision") return NextResponse.json({ ok: true, data: await runtime.rab.createRevision.execute(context(request, body.projectId, "browser-rab-revision"), { rabVersionId: body.rabVersionId }) });

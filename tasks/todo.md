@@ -1,56 +1,58 @@
-# P1 Deterministic RAB/EE Core Checklist
+# P1 Excel Exporter Checklist
 
-## Task 1: Golden oracle
+## Task 1: Application export boundary
 
 **Acceptance criteria:**
 
-- [x] GT-01 through GT-12 remain source-backed and cite canonical source locators.
-- [x] Exact expected values, tolerances, and classifications are not altered to fit code.
+- [ ] Working export permits TECHNICAL/ADMIN only for DRAFT/REVIEW.
+- [ ] Official export permits ADMIN only for FINAL.
+- [ ] FINAL export uses persisted snapshot and does not read live master data.
 
-**Verification:** `pnpm test -- tests/golden-reference/rab-ee-golden.test.ts`
+**Verification:** `pnpm test -- tests/export/excel-export.test.ts`
 
 **Dependencies:** None
 
-## Task 2: Contract-derived acceptance
+## Task 2: Workbook generator
 
 **Acceptance criteria:**
 
-- [x] Valid direct volume, MANUAL/NON-AHSP, and ZERO_CONFIRMED are labelled `CONTRACT-DERIVED`.
-- [x] D-023, D-024, missing price, unresolved zero, unit, and ambiguity paths are covered.
+- [ ] Required 9-sheet structure and stable tables exist.
+- [ ] Formula-active HSP, item, recap, PPN, and half-up rounding chain exists.
+- [ ] Workbook has no external links, macros, or fixed-row business dependencies.
 
-**Verification:** `pnpm test -- tests/contract-derived/rab-ee-contract.test.ts`
+**Verification:** `pnpm test -- tests/export/excel-workbook.test.ts`
 
 **Dependencies:** Task 1
 
-## Task 3: Pure deterministic core
+## Task 3: Browser delivery
 
 **Acceptance criteria:**
 
-- [x] All requested calculation stages use canonical decimal arithmetic.
-- [x] Native JavaScript numbers are rejected at critical boundaries.
-- [x] Same valid input produces byte-identical canonical output repeatedly.
+- [ ] Working and Official controls call the actual delivery route.
+- [ ] UI shows actual artifact success/failure and does not claim success when blocked.
 
-**Verification:** Golden, contract-derived, and decimal unit tests pass.
+**Verification:** `pnpm test -- tests/integration/office-workflow-delivery.test.ts`
 
 **Dependencies:** Tasks 1–2
 
-## Task 4: Purity and scope guard
+## Task 4: Evidence and gates
 
 **Acceptance criteria:**
 
-- [x] Calculation package has no forbidden web, database, filesystem, Excel, AI, or network dependency.
-- [x] No UI, exporter, persistence schema, PDF, RKS, or later-phase feature is added.
+- [ ] EXP-01 through EXP-20 are covered or explicitly documented as deferred by current model boundaries.
+- [ ] Handoff records actual command output, changed files, and known limitations.
+- [ ] Full regression gates pass.
 
-**Verification:** `pnpm boundaries` and purity contract test.
+**Verification:** `pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm boundaries && pnpm db:check`
 
-**Dependencies:** Task 3
+**Dependencies:** Tasks 1–3
 
-## Task 5: Full gates and handoff
+## Task 5: Commit gate
 
 **Acceptance criteria:**
 
-- [x] `lint`, `typecheck`, `test`, `build`, and `boundaries` have current PASS evidence.
-- [x] P1 handoff records scope, decimal strategy, GT matrix, contract tests, repeatability, differences, limitations, files, hash, and recommendation.
+- [ ] Only verified exporter implementation is committed.
+- [ ] Recommendation is exactly one allowed Phase 1 exporter status.
 
 **Verification:** clean review of git diff, command output, and handoff.
 
