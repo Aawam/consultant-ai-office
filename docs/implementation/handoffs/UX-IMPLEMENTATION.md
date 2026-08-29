@@ -126,6 +126,6 @@ Excel/PDF output implementation, Phase 2–5 features, arbitrary formula editing
 
 ## 10. Commit and recommendation
 
-Implementation commit: `184b8c4` (`feat: add application composition runtime`). The composition-root and integration gates are green. Excel exporter was not started.
+Implementation commit: `14f2bc2` (`feat: add application composition runtime`). The composition-root and integration gates are green. Excel exporter was not started.
 
 **READY FOR EXCEL EXPORTER**
