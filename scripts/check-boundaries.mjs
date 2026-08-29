@@ -15,6 +15,7 @@ const modules = [
     sourceDirectory: "app",
     allowed: [
       "@consultant-ai-office/application",
+      "@consultant-ai-office/office-runtime",
       "@consultant-ai-office/shared-contracts",
     ],
   },
@@ -59,6 +60,17 @@ const modules = [
     allowed: [
       "@consultant-ai-office/application",
       "@consultant-ai-office/domain",
+      "@consultant-ai-office/shared-contracts",
+    ],
+  },
+  {
+    directory: "packages/office-runtime",
+    packageName: "@consultant-ai-office/office-runtime",
+    sourceDirectory: "src",
+    allowed: [
+      "@consultant-ai-office/application",
+      "@consultant-ai-office/domain",
+      "@consultant-ai-office/infrastructure",
       "@consultant-ai-office/shared-contracts",
     ],
   },

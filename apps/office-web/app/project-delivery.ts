@@ -4,6 +4,7 @@ import {
   type CreateProjectUseCase,
   type RequestContext,
 } from "@consultant-ai-office/application";
+import type { OfficeRuntime } from "@consultant-ai-office/office-runtime";
 
 export type DeliveryResult<T> =
   | { readonly ok: true; readonly data: T }
@@ -57,4 +58,8 @@ export function createProjectDelivery(dependencies: {
       }
     },
   });
+}
+
+export function createProjectDeliveryFromRuntime(runtime: Pick<OfficeRuntime, "projects">) {
+  return createProjectDelivery({ createProject: runtime.projects.create });
 }

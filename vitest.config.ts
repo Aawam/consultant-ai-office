@@ -23,6 +23,9 @@ export default defineConfig({
           import.meta.url,
         ),
       ),
+      "@consultant-ai-office/office-runtime": fileURLToPath(
+        new URL("./packages/office-runtime/src/index.ts", import.meta.url),
+      ),
       "@consultant-ai-office/shared-contracts": fileURLToPath(
         new URL("./packages/shared-contracts/src/index.ts", import.meta.url),
       ),

@@ -44,6 +44,9 @@ importers:
       '@consultant-ai-office/application':
         specifier: workspace:*
         version: link:../../packages/application
+      '@consultant-ai-office/office-runtime':
+        specifier: workspace:*
+        version: link:../../packages/office-runtime
       '@consultant-ai-office/shared-contracts':
         specifier: workspace:*
         version: link:../../packages/shared-contracts
@@ -114,6 +117,24 @@ importers:
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(@types/pg@8.23.1)(pg@8.23.0)
+      pg:
+        specifier: 8.23.0
+        version: 8.23.0
+
+  packages/office-runtime:
+    dependencies:
+      '@consultant-ai-office/application':
+        specifier: workspace:*
+        version: link:../application
+      '@consultant-ai-office/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@consultant-ai-office/infrastructure':
+        specifier: workspace:*
+        version: link:../infrastructure
+      '@consultant-ai-office/shared-contracts':
+        specifier: workspace:*
+        version: link:../shared-contracts
       pg:
         specifier: 8.23.0
         version: 8.23.0
