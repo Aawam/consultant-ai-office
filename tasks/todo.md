@@ -4,9 +4,9 @@
 
 **Acceptance criteria:**
 
-- [ ] Working export permits TECHNICAL/ADMIN only for DRAFT/REVIEW.
-- [ ] Official export permits ADMIN only for FINAL.
-- [ ] FINAL export uses persisted snapshot and does not read live master data.
+- [x] Working export permits TECHNICAL/ADMIN only for DRAFT/REVIEW.
+- [x] Official export permits ADMIN only for FINAL.
+- [x] FINAL export uses persisted snapshot and does not read live master data.
 
 **Verification:** `pnpm test -- tests/export/excel-export.test.ts`
 
@@ -16,9 +16,9 @@
 
 **Acceptance criteria:**
 
-- [ ] Required 9-sheet structure and stable tables exist.
-- [ ] Formula-active HSP, item, recap, PPN, and half-up rounding chain exists.
-- [ ] Workbook has no external links, macros, or fixed-row business dependencies.
+- [x] Required 9-sheet structure and stable tables exist.
+- [x] Formula-active HSP, item, recap, PPN, and half-up rounding chain exists.
+- [x] Workbook has no external links, macros, or fixed-row business dependencies.
 
 **Verification:** `pnpm test -- tests/export/excel-workbook.test.ts`
 
@@ -28,8 +28,8 @@
 
 **Acceptance criteria:**
 
-- [ ] Working and Official controls call the actual delivery route.
-- [ ] UI shows actual artifact success/failure and does not claim success when blocked.
+- [x] Working and Official controls call the actual delivery route.
+- [x] UI shows actual artifact success/failure and does not claim success when blocked.
 
 **Verification:** `pnpm test -- tests/integration/office-workflow-delivery.test.ts`
 
@@ -39,9 +39,9 @@
 
 **Acceptance criteria:**
 
-- [ ] EXP-01 through EXP-20 are covered or explicitly documented as deferred by current model boundaries.
-- [ ] Handoff records actual command output, changed files, and known limitations.
-- [ ] Full regression gates pass.
+- [ ] EXP-01 through EXP-20 are fully covered; partial coverage and blockers are documented.
+- [x] Handoff records actual command output, changed files, and known limitations.
+- [x] Full regression gates pass.
 
 **Verification:** `pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm boundaries && pnpm db:check`
 

@@ -21,30 +21,30 @@ Implement the production Phase 1 Excel exporter from the canonical Excel Output 
 
 ### Phase 1: Application and artifact contracts
 
-- [ ] Add export request/result types, artifact port, and Application export use cases.
-- [ ] Add project lookup-by-ID and artifact persistence adapter.
+- [x] Add export request/result types, artifact port, and Application export use cases.
+- [x] Add project lookup-by-ID and artifact persistence adapter.
 
 ### Checkpoint: Contract RED
 
-- [ ] Export authorization and artifact behavior tests fail before implementation.
+- [x] Export authorization and artifact behavior tests pass.
 
 ### Phase 2: Workbook slice
 
-- [ ] Implement self-contained 9-sheet workbook generator.
-- [ ] Implement formula-active HSP/item/recap/rounding chains and traceability metadata.
-- [ ] Implement locked review/final workbook behavior and checks.
+- [x] Implement self-contained 9-sheet workbook generator.
+- [x] Implement formula-active HSP/item/recap/rounding chains and traceability metadata.
+- [x] Implement locked review/final workbook behavior and checks.
 
 ### Checkpoint: Workbook GREEN
 
-- [ ] Generated files parse successfully and contain required tables/formulas with no external links/macros.
-- [ ] Numeric and reproducibility acceptance tests pass.
+- [x] Generated files parse successfully and contain required tables/formulas with no external links/macros.
+- [ ] Numeric and reproducibility acceptance tests pass for complete BV/source snapshot coverage.
 
 ### Phase 3: Delivery and handoff
 
-- [ ] Wire runtime, route, and UX controls to real Working/Official exports.
+- [x] Wire runtime, route, and UX controls to real Working/Official exports.
 - [ ] Add EXP-01 through EXP-20 focused coverage where the current persisted model permits.
-- [ ] Run required gates including `pnpm db:check` and write `docs/implementation/handoffs/EXCEL-EXPORTER.md`.
-- [ ] Commit verified increments with traceable hashes.
+- [x] Run required gates including `pnpm db:check` and write `docs/implementation/handoffs/EXCEL-EXPORTER.md`.
+- [x] Commit verified increments with traceable hashes; readiness remains blocked by documented gaps.
 
 ## Risks and Mitigations
 
