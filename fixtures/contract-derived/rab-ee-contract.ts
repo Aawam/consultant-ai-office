@@ -1,0 +1,151 @@
+export const CONTRACT_DERIVED_LABEL = "CONTRACT-DERIVED — NOT GOLDEN REFERENCE";
+
+export const contractDerivedFixtures = {
+  validDirectVolume: {
+    itemId: "cd-direct-1",
+    description: "Mobilisasi sederhana",
+    volume: "1",
+    volumeUnitRaw: "LS",
+    volumeSource: {
+      kind: "DIRECT",
+      quantityKind: "LUMP_SUM",
+      basis: "Satu paket pekerjaan sesuai kontrak",
+      source: "Dokumen kontrak item 1",
+      note: "Tidak memerlukan geometri",
+      reviewerId: "reviewer-contract-derived",
+    },
+    hsp: {
+      kind: "OFFICIAL_AHSP",
+      unitRaw: "LS",
+      hspValue: "1250000",
+      components: [
+        {
+          componentId: "cd-direct-component",
+          group: "BAHAN",
+          coefficient: "1",
+          resourceUnitRaw: "LS",
+          resolutionState: "RESOLVED",
+          basePrice: {
+            priceValue: "1250000",
+            priceState: "SET",
+            priceUnitRaw: "LS",
+            zeroIntent: null,
+          },
+        },
+      ],
+    },
+  },
+  validManualHsp: {
+    itemId: "cd-manual-1",
+    description: "Pekerjaan non-AHSP",
+    volume: "2.5",
+    volumeUnitRaw: "unit",
+    volumeSource: {
+      kind: "BACKUP_VOLUME",
+      bvReferenceId: "bv-contract-derived-manual",
+    },
+    hsp: {
+      kind: "MANUAL_NON_AHSP",
+      unitRaw: "unit",
+      manualHsp: "800000",
+      note: "Harga final hasil kaji ulang estimator",
+    },
+  },
+  zeroConfirmed: {
+    componentId: "cd-zero-confirmed",
+    group: "BAHAN",
+    coefficient: "3.25",
+    resourceUnitRaw: "liter",
+    resolutionState: "RESOLVED",
+    basePrice: {
+      priceValue: "0",
+      priceState: "ZERO_CONFIRMED",
+      priceUnitRaw: "liter",
+      zeroIntent: "Air tersedia tanpa biaya dan telah dikonfirmasi reviewer",
+    },
+  },
+  zeroVolume: {
+    itemId: "cd-zero-volume",
+    description: "Item aktif belum dihitung",
+    volume: "0",
+    volumeUnitRaw: "m3",
+    volumeSource: {
+      kind: "BACKUP_VOLUME",
+      bvReferenceId: "bv-incomplete",
+    },
+    hsp: {
+      kind: "OFFICIAL_AHSP",
+      unitRaw: "m3",
+      hspValue: "153810.8",
+      components: [],
+    },
+  },
+  zeroManualHsp: {
+    itemId: "cd-zero-manual",
+    description: "Item manual belum dihargai",
+    volume: "1",
+    volumeUnitRaw: "unit",
+    volumeSource: {
+      kind: "BACKUP_VOLUME",
+      bvReferenceId: "bv-zero-manual",
+    },
+    hsp: {
+      kind: "MANUAL_NON_AHSP",
+      unitRaw: "unit",
+      manualHsp: "0",
+      note: "Harga belum selesai",
+    },
+  },
+  missingBasePrice: {
+    componentId: "cd-missing-price",
+    group: "BAHAN",
+    coefficient: "1",
+    resourceUnitRaw: "m",
+    resolutionState: "RESOLVED",
+    basePrice: {
+      priceValue: null,
+      priceState: "MISSING",
+      priceUnitRaw: "m",
+      zeroIntent: null,
+    },
+  },
+  unresolvedZero: {
+    componentId: "cd-unresolved-zero",
+    group: "BAHAN",
+    coefficient: "1",
+    resourceUnitRaw: "liter",
+    resolutionState: "RESOLVED",
+    basePrice: {
+      priceValue: "0",
+      priceState: "MISSING",
+      priceUnitRaw: "liter",
+      zeroIntent: null,
+    },
+  },
+  incompatibleUnit: {
+    componentId: "cd-incompatible-unit",
+    group: "BAHAN",
+    coefficient: "1",
+    resourceUnitRaw: "kg",
+    resolutionState: "RESOLVED",
+    basePrice: {
+      priceValue: "1000",
+      priceState: "SET",
+      priceUnitRaw: "m3",
+      zeroIntent: null,
+    },
+  },
+  ambiguousComponent: {
+    componentId: "cd-ambiguous",
+    group: "BAHAN",
+    coefficient: "1",
+    resourceUnitRaw: "buah",
+    resolutionState: "AMBIGUOUS",
+    basePrice: {
+      priceValue: "41040",
+      priceState: "SET",
+      priceUnitRaw: "buah",
+      zeroIntent: null,
+    },
+  },
+} as const;

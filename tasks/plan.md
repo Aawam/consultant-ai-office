@@ -1,83 +1,63 @@
-# Implementation Plan: Phase 0 + Phase 1 Kickoff Bootstrap
+# Implementation Plan: P1 Deterministic RAB/EE Core + Golden Test
 
 ## Overview
 
-Bootstrap one local-first, server-ready modular monolith for the Phase 0 AI Office foundation and Phase 1 RAB/EE capability. This kickoff establishes enforceable boundaries, deterministic numeric infrastructure, PostgreSQL migrations, and green quality gates without implementing broad Phase 0 UI or Phase 1 business calculations.
+Implement the in-memory deterministic Phase 1 calculation boundary from the canonical Decision Log, AHSP normalization contract, Golden Test contract, and Manager closeout. The work is limited to the `rab-calculation-engine`, source-backed Golden fixtures/tests, separately labelled contract-derived fixtures/tests, and the required handoff.
 
 ## Source Audit Result
 
-- Canonical precedence is usable and no unresolved contract conflict blocks bootstrap.
-- D-023 and D-024 supersede stale zero-policy text in the Golden Test document.
-- Jalur A, B, and C are final implementation contracts; reference binaries remain evidence/reference data only.
+- Baseline commit `7305705569079cb2b8abc016c2d24f4086105fac` is an ancestor of the current repository state.
+- D-023 and D-024 supersede the stale zero-policy sections in the Golden Test document.
+- No unresolved canonical conflict blocks implementation.
 
 ## Architecture Decisions
 
-- Use a pnpm TypeScript workspace and one Next.js App Router application.
-- Keep the six required packages as explicit workspace packages in one deployable modular monolith.
-- Use PostgreSQL 17 locally and Drizzle's versioned `generate`/`migrate` workflow.
-- Represent critical arithmetic with `decimal.js` in TypeScript and `numeric` in PostgreSQL; binary floating point is forbidden at critical RAB boundaries.
-- Enforce package direction through declared workspace dependencies plus an executable boundary check.
-- Keep AI optional and expose only controlled tool contracts targeting application use cases.
-
-## Dependency Direction
-
-```text
-office-web ───────┐
-ai-agent ─────────┼─> application ─> domain
-                  │        └────────> rab-calculation-engine
-infrastructure ───┘        └────────> shared-contracts
-
-infrastructure implements application/domain ports.
-No package may depend on office-web or ai-agent.
-```
+- Preserve the bootstrap `decimal.js` strategy: critical values enter as decimal text or bigint, never native JavaScript `number`.
+- Return canonical decimal strings from the engine; database, Excel, and UI representations remain outside the core.
+- Model only pure calculation inputs/results and review-validation data required by P1 tests.
+- Represent Golden BV evidence with the six controlled semantic operations named by the Golden contract; do not add an expression parser or arbitrary formula engine.
+- Keep Golden Reference and CONTRACT-DERIVED fixtures/tests physically and semantically separate.
 
 ## Task List
 
-### Phase 1: Repository foundation
+### Phase 1: Oracle and public contracts
 
-- [x] Create Git, workspace, TypeScript, lint, test, and build configuration.
-- [x] Add root rules, environment template, reference provenance, and scope documentation.
+- [x] Add source-backed GT-01 through GT-12 fixtures and failing Golden tests.
+- [x] Add labelled CONTRACT-DERIVED fixtures and failing validation/calculation tests.
 
-### Checkpoint: Foundation
+### Checkpoint: RED
 
-- [x] Dependency installation succeeds.
-- [x] Workspace discovery and boundary check succeed.
+- [x] Target tests fail because the P1 calculation/validation API is not implemented.
 
-### Phase 2: Minimal executable slices
+### Phase 2: Deterministic calculation slices
 
-- [x] Add package entry points and controlled contracts with no broad business implementation.
-- [x] Add deterministic decimal strategy proof and boundary tests.
-- [x] Add Next.js shell and PostgreSQL/Drizzle migration skeleton.
+- [x] Implement controlled BV operations and exact decimal primitives.
+- [x] Implement component, AHSP/HSP, manual HSP, item, subgroup, group, PPN, and final rounding calculations.
+- [x] Implement contract-required review validation and conservative unit normalization.
 
-### Checkpoint: Executable baseline
+### Checkpoint: GREEN
 
-- [x] Lint and typecheck pass.
-- [x] Unit/contract tests pass.
-- [x] Production build passes.
+- [x] Golden tests pass without changing their oracle.
+- [x] Contract-derived tests pass and repeatability is exact.
 
-### Phase 3: Documentation and handoff
+### Phase 3: Quality and handoff
 
-- [x] Record technical decisions and implementation status.
-- [x] Perform code-quality review and fix material findings.
-- [x] Commit the verified baseline and record the baseline commit hash in the handoff.
-
-### Checkpoint: Ready
-
-- [x] Working tree is clean after the documentation commit.
-- [x] Handoff contains actual command evidence and readiness verdict.
+- [x] Verify engine purity and package boundaries.
+- [ ] Run lint, typecheck, test, build, and boundaries on the final change.
+- [ ] Write `docs/implementation/handoffs/P1-CORE-GOLDEN.md` with actual evidence and recommendation.
+- [ ] Commit the verified implementation and handoff with traceable hashes.
 
 ## Risks and Mitigations
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| Package boundaries exist only on paper | High | Executable boundary script and workspace dependency allowlist |
-| Binary floating-point leaks into RAB arithmetic | Critical | Decimal-only public calculation boundary and test evidence |
-| Scaffold grows into premature business implementation | Medium | Only smoke behavior and contracts in this kickoff |
-| Reference files become accidental rules | High | Hash manifest labels each file as non-authoritative reference data |
-| Migration workflow drifts | Medium | Versioned SQL migration directory plus Drizzle config/commands |
+| Native `number` leaks into critical arithmetic | Critical | Runtime decimal-text boundary plus regression tests |
+| Legacy Excel rounding becomes business behavior | Critical | GT-07 and GT-11 assert full precision and one final half-up rounding |
+| Synthetic data is mislabeled Golden | High | Separate fixture roots and explicit `CONTRACT-DERIVED` labels |
+| Missing/zero prices are conflated | High | Enforce `MISSING / SET / ZERO_CONFIRMED` semantics |
+| Unit aliases create implicit conversion | High | SAFE_ALIAS-only canonicalization and incompatibility errors |
+| General formula engine expands scope | High | Closed discriminated union of six Golden BV operations |
 
 ## Open Questions
 
-- Exact physical database schema and ID encoding remain future technical blueprint decisions.
-- Minimum supported Microsoft Excel version remains deferred to the exporter blueprint.
-- Per-record AHSP mapping anomalies remain data-resolution work when affected records are used.
+None. D-023/D-024 resolve the only stale Golden-spec policy gaps relevant to this workstream.

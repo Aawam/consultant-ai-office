@@ -1,57 +1,57 @@
-# Kickoff Bootstrap Checklist
+# P1 Deterministic RAB/EE Core Checklist
 
-## Task 1: Workspace foundation
+## Task 1: Golden oracle
 
 **Acceptance criteria:**
 
-- [x] Required logical directories are workspace packages.
-- [x] Root commands exist for install, lint, typecheck, test, build, and boundary validation.
+- [x] GT-01 through GT-12 remain source-backed and cite canonical source locators.
+- [x] Exact expected values, tolerances, and classifications are not altered to fit code.
 
-**Verification:** `pnpm install` and `pnpm boundaries`
+**Verification:** `pnpm test -- tests/golden-reference/rab-ee-golden.test.ts`
 
 **Dependencies:** None
 
-## Task 2: Governance and provenance
+## Task 2: Contract-derived acceptance
 
 **Acceptance criteria:**
 
-- [x] Root `AGENTS.md` locks all requested canonical guardrails.
-- [x] Reference manifest records SHA-256, role, and provenance without promoting reference files to authority.
+- [x] Valid direct volume, MANUAL/NON-AHSP, and ZERO_CONFIRMED are labelled `CONTRACT-DERIVED`.
+- [x] D-023, D-024, missing price, unresolved zero, unit, and ambiguity paths are covered.
 
-**Verification:** contract test scans required rules and manifest entries.
+**Verification:** `pnpm test -- tests/contract-derived/rab-ee-contract.test.ts`
 
 **Dependencies:** Task 1
 
-## Task 3: Deterministic package baseline
+## Task 3: Pure deterministic core
 
 **Acceptance criteria:**
 
-- [x] Six required packages compile through explicit dependency direction.
-- [x] Critical decimal boundary rejects native numbers and proves exact decimal behavior.
+- [x] All requested calculation stages use canonical decimal arithmetic.
+- [x] Native JavaScript numbers are rejected at critical boundaries.
+- [x] Same valid input produces byte-identical canonical output repeatedly.
 
-**Verification:** `pnpm test` and `pnpm typecheck`
+**Verification:** Golden, contract-derived, and decimal unit tests pass.
 
-**Dependencies:** Task 1
+**Dependencies:** Tasks 1–2
 
-## Task 4: Web and PostgreSQL baseline
-
-**Acceptance criteria:**
-
-- [x] Minimal Next.js shell builds.
-- [x] Compose and Drizzle migration skeleton are documented and internally consistent.
-
-**Verification:** `pnpm build` and migration config tests.
-
-**Dependencies:** Tasks 1 and 3
-
-## Task 5: Handoff and commit
+## Task 4: Purity and scope guard
 
 **Acceptance criteria:**
 
-- [x] Actual quality-gate results are recorded.
-- [x] Baseline commit hash is recorded after the verified commit.
-- [x] Readiness verdict is explicit.
+- [x] Calculation package has no forbidden web, database, filesystem, Excel, AI, or network dependency.
+- [x] No UI, exporter, persistence schema, PDF, RKS, or later-phase feature is added.
 
-**Verification:** clean `git status` and handoff review.
+**Verification:** `pnpm boundaries` and purity contract test.
+
+**Dependencies:** Task 3
+
+## Task 5: Full gates and handoff
+
+**Acceptance criteria:**
+
+- [ ] `lint`, `typecheck`, `test`, `build`, and `boundaries` have current PASS evidence.
+- [ ] P1 handoff records scope, decimal strategy, GT matrix, contract tests, repeatability, differences, limitations, files, hash, and recommendation.
+
+**Verification:** clean review of git diff, command output, and handoff.
 
 **Dependencies:** Tasks 1–4
