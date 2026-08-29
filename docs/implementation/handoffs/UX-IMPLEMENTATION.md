@@ -138,6 +138,6 @@ Excel/PDF output implementation, Phase 2–5 features, arbitrary formula editing
 
 ## 10. Commit and recommendation
 
-Implementation commits: `14f2bc2` (`feat: add application composition runtime`) and the browser delivery wiring commit created for this handoff. Composition, delivery, and regression gates are green. Excel exporter was not started.
+Implementation commits: `14f2bc2` (`feat: add application composition runtime`) and `d09ee0f` (`feat: wire browser rab workflow delivery`). Composition, delivery, and regression gates are green. Excel exporter was not started.
 
 **READY FOR EXCEL EXPORTER**
