@@ -92,7 +92,7 @@ Normalized `master_ahsps`, `ahsp_components`, `resources`, `base_prices`, and `p
 
 ## 9. Commit hash
 
-Commit hash: recorded after the final commit.
+Integration implementation commit: `0b6708173883c5ea144cb204586a5b453cbae6f8`.
 
 ## Final recommendation
 
