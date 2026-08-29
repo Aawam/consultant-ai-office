@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export type ProjectPreview =
   | null
@@ -23,8 +23,48 @@ export function OfficeWorkspace({ preview, code, name }: { preview: ProjectPrevi
   const [role, setRole] = useState<Role>("TECHNICAL");
   const [status, setStatus] = useState<Status>("DRAFT");
   const [notice, setNotice] = useState("");
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [rabVersionId, setRabVersionId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const activeWorkspace = workspaces.find(([key]) => key === workspace)?.[1] ?? "Overview";
   const notify = (message: string) => setNotice(message);
+  const reload = async (ids: { projectId?: string | null; rabVersionId?: string | null } = {}) => {
+    const nextProjectId = ids.projectId ?? projectId ?? new URLSearchParams(window.location.search).get("projectId");
+    const nextRabVersionId = ids.rabVersionId ?? rabVersionId ?? new URLSearchParams(window.location.search).get("rabVersionId");
+    setLoading(true);
+    try {
+      const query = new URLSearchParams();
+      if (nextProjectId) query.set("projectId", nextProjectId);
+      if (nextRabVersionId) query.set("rabVersionId", nextRabVersionId);
+      const response = await fetch(`/api/workflow?${query.toString()}`, { headers: { "x-office-role": role } });
+      const result = await response.json() as { ok: boolean; data?: { activeProject?: { projectId: string } | null; rab?: { rabVersionId: string; status: Status } | null }; error?: { message: string } };
+      if (!response.ok || !result.ok) throw new Error(result.error?.message ?? "Workflow reload failed");
+      const activeId = result.data?.activeProject?.projectId ?? nextProjectId ?? null;
+      const loadedRab = result.data?.rab ?? null;
+      setProjectId(activeId);
+      setRabVersionId(loadedRab?.rabVersionId ?? nextRabVersionId ?? null);
+      if (loadedRab) setStatus(loadedRab.status);
+      const url = new URL(window.location.href);
+      if (activeId) url.searchParams.set("projectId", activeId);
+      if (loadedRab?.rabVersionId) url.searchParams.set("rabVersionId", loadedRab.rabVersionId);
+      window.history.replaceState({}, "", url);
+    } catch (error) { notify(error instanceof Error ? error.message : "Workflow reload failed"); }
+    finally { setLoading(false); }
+  };
+  const mutate = async (action: string, extra: Record<string, string> = {}) => {
+    setLoading(true);
+    try {
+      const response = await fetch("/api/workflow", { method: "POST", headers: { "content-type": "application/json", "x-office-role": role }, body: JSON.stringify({ action, projectId, rabVersionId, ...extra }) });
+      const result = await response.json() as { ok: boolean; data?: { project?: { projectId: string }; activeContext?: { projectId: string }; rabVersionId?: string }; error?: { message: string } };
+      if (!response.ok || !result.ok) throw new Error(result.error?.message ?? "Workflow mutation failed");
+      const newProjectId = result.data?.project?.projectId ?? result.data?.activeContext?.projectId ?? projectId;
+      const newRabVersionId = result.data?.rabVersionId ?? rabVersionId;
+      await reload({ projectId: newProjectId, rabVersionId: newRabVersionId });
+      setNotice("Mutation persisted. State loaded again from Application/Repository path.");
+    } catch (error) { notify(error instanceof Error ? error.message : "Workflow mutation failed"); setLoading(false); }
+  };
+  useEffect(() => { const timer = window.setTimeout(() => { void reload(); }, 0); return () => window.clearTimeout(timer); // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role]);
 
   return <main className="app-shell">
     <aside className="sidebar" aria-label="Global navigation">
@@ -38,20 +78,27 @@ export function OfficeWorkspace({ preview, code, name }: { preview: ProjectPrevi
       <header className="topbar"><div><p className="eyebrow">CONSULTANT AI OFFICE</p><p className="breadcrumb">Project workspace / {activeWorkspace}</p></div><div className="topbar-meta"><span className="role-badge">{role}</span><span className="state-badge">{status}</span></div></header>
       <section className="context-strip" aria-labelledby="active-context-title"><div className="context-main"><span className="context-index">01</span><div><p id="active-context-title">Active Project Context</p><strong>{preview && preview.ok ? preview.data.project.name : "Belum dipilih"}</strong><span>{preview && preview.ok ? preview.data.project.code : "Project · RAB version · price context belum tersedia"}</span></div></div><dl><div><dt>RAB version</dt><dd>—</dd></div><div><dt>Lifecycle</dt><dd>{status}</dd></div><div><dt>AI</dt><dd>DISABLED</dd></div></dl></section>
       {notice && <div className="notice" role="status"><strong>Interaction boundary</strong><span>{notice}</span><button type="button" aria-label="Tutup notifikasi" onClick={() => setNotice("")}>×</button></div>}
-      {workspace === "overview" && <Overview preview={preview} code={code} name={name} onAction={notify} />}
+      {loading && <div className="notice" role="status">Loading persisted state…</div>}
+      {workspace === "overview" && <Overview preview={preview} code={code} name={name} onAction={notify} onMutate={mutate} />}
       {workspace === "rab" && <RabWorkspace status={status} onStatus={setStatus} onAction={notify} />}
       {workspace === "review" && <ReviewWorkspace role={role} status={status} onAction={notify} />}
       {workspace === "activity" && <ActivityWorkspace />}
+      <LiveWorkflowControls projectId={projectId} rabVersionId={rabVersionId} role={role} status={status} loading={loading} onMutate={mutate} />
     </section>
   </main>;
 }
 
-function Overview({ preview, code, name, onAction }: { preview: ProjectPreview; code: string; name: string; onAction: (message: string) => void }) {
-  return <><PageHeading eyebrow="DELIVERY / PRESENTATION LAYER" title="AI Office workspace" detail="Structured workspaces remain primary; AI is contextual and optional." /><div className="overview-grid"><section className="panel" aria-labelledby="ai-title"><PanelHeading eyebrow="AI ASSISTANT · AI SUGGESTION" title="Contextual assistant" chip="NOT SAVED" /><label htmlFor="ai-prompt">Ask for search, explanation, or missing-data detection</label><textarea id="ai-prompt" disabled placeholder="AI provider nonaktif — jalur structured workspace tetap tersedia." /><div className="panel-footer"><span>AI tidak menghitung, memfinalkan, atau menulis diam-diam.</span><button type="button" disabled>Ask AI</button></div></section><ProjectPanel preview={preview} code={code} name={name} onAction={onAction} /></div><section className="panel" aria-labelledby="boundary-title"><PanelHeading eyebrow="INTERACTION MODE CONTRACT" title="One controlled path" chip="APPLICATION LAYER" /><ol className="flow-list"><li><span>01</span><div><strong>Read / Preview</strong><p>UI menampilkan saved data atau deterministic result dari Application Layer.</p></div></li><li><span>02</span><div><strong>Confirm</strong><p>Warning dan consequential action meminta konfirmasi actor yang sesuai.</p></div></li><li><span>03</span><div><strong>Write / Audit</strong><p>Authorization, transaction, lifecycle, dan audit tidak diputuskan di UI.</p></div></li></ol></section></>;
+function LiveWorkflowControls({ projectId, rabVersionId, role, status, loading, onMutate }: { projectId: string | null; rabVersionId: string | null; role: Role; status: Status; loading: boolean; onMutate: (action: string, extra?: Record<string, string>) => Promise<void> }) {
+  if (!projectId) return null;
+  return <section className="panel live-controls" aria-labelledby="live-workflow-title"><PanelHeading eyebrow="LIVE APPLICATION WORKFLOW" title="Persisted browser actions" chip={loading ? "LOADING" : "READY"} /><p className="muted">Project ID: <code>{projectId}</code>{rabVersionId ? <> · RAB ID: <code>{rabVersionId}</code></> : null}</p><div className="action-row"><button type="button" disabled={loading || Boolean(rabVersionId)} onClick={() => void onMutate("create_draft", { title: "Browser RAB DRAFT" })}>Create RAB DRAFT</button><button type="button" className="secondary-button" disabled={loading || !rabVersionId || status !== "DRAFT"} onClick={() => void onMutate("submit_review")}>Submit REVIEW</button><button type="button" className="secondary-button" disabled={loading || role !== "ADMIN" || !rabVersionId || status !== "REVIEW"} onClick={() => void onMutate("finalize")}>ADMIN Finalize</button><button type="button" className="secondary-button" disabled={loading || !rabVersionId || status !== "FINAL"} onClick={() => void onMutate("create_revision")}>Create Revision</button></div><p className="field-help">Every action POSTs to server delivery, then reloads state with GET. Disabled controls are presentation only; Application authorization remains authoritative.</p></section>;
 }
 
-function ProjectPanel({ preview, code, name, onAction }: { preview: ProjectPreview; code: string; name: string; onAction: (message: string) => void }) {
-  return <section className="panel" aria-labelledby="project-selection-title"><PanelHeading eyebrow="SAVED PROJECT DATA" title="Project selection" chip="PREVIEW" /><form className="project-form" method="get"><label htmlFor="project-code">Kode project</label><input id="project-code" name="code" defaultValue={code} placeholder="Contoh: BRU-01" maxLength={20} required /><label htmlFor="project-name">Nama project</label><input id="project-name" name="name" defaultValue={name} placeholder="Contoh: Kantor Camat" maxLength={120} required /><button type="submit">Validasi &amp; preview</button></form>{preview === null && <EmptyState title="Belum ada preview" detail="Isi kode dan nama untuk validasi domain tanpa mutation." />}{preview && preview.ok && <div className="success-state" role="status"><span className="severity-tag success">SUCCESS</span><h3>{preview.data.project.name}</h3><dl className="data-list"><div><dt>Kode</dt><dd>{preview.data.project.code}</dd></div><div><dt>State</dt><dd>{preview.data.state}</dd></div><div><dt>Fingerprint</dt><dd><code>{preview.data.previewFingerprint}</code></dd></div></dl><p>Preview tidak membuat project, context, execution, atau audit row.</p><button type="button" className="secondary-button" onClick={() => onAction("Select active project memerlukan SelectActiveProjectUseCase dan runtime composition.")}>Select active project</button></div>}{preview && !preview.ok && <div className="error-state" role="alert"><span className="severity-tag error">ERROR</span><h3>Preview ditolak</h3><p>{preview.message}</p></div>}</section>;
+function Overview({ preview, code, name, onAction, onMutate }: { preview: ProjectPreview; code: string; name: string; onAction: (message: string) => void; onMutate: (action: string, extra?: Record<string, string>) => Promise<void> }) {
+  return <><PageHeading eyebrow="DELIVERY / PRESENTATION LAYER" title="AI Office workspace" detail="Structured workspaces remain primary; AI is contextual and optional." /><div className="overview-grid"><section className="panel" aria-labelledby="ai-title"><PanelHeading eyebrow="AI ASSISTANT · AI SUGGESTION" title="Contextual assistant" chip="NOT SAVED" /><label htmlFor="ai-prompt">Ask for search, explanation, or missing-data detection</label><textarea id="ai-prompt" disabled placeholder="AI provider nonaktif — jalur structured workspace tetap tersedia." /><div className="panel-footer"><span>AI tidak menghitung, memfinalkan, atau menulis diam-diam.</span><button type="button" disabled>Ask AI</button></div></section><ProjectPanel preview={preview} code={code} name={name} onAction={onAction} onMutate={onMutate} /></div><section className="panel" aria-labelledby="boundary-title"><PanelHeading eyebrow="INTERACTION MODE CONTRACT" title="One controlled path" chip="APPLICATION LAYER" /><ol className="flow-list"><li><span>01</span><div><strong>Read / Preview</strong><p>UI menampilkan saved data atau deterministic result dari Application Layer.</p></div></li><li><span>02</span><div><strong>Confirm</strong><p>Warning dan consequential action meminta konfirmasi actor yang sesuai.</p></div></li><li><span>03</span><div><strong>Write / Audit</strong><p>Authorization, transaction, lifecycle, dan audit tidak diputuskan di UI.</p></div></li></ol></section></>;
+}
+
+function ProjectPanel({ preview, code, name, onAction, onMutate }: { preview: ProjectPreview; code: string; name: string; onAction: (message: string) => void; onMutate: (action: string, extra?: Record<string, string>) => Promise<void> }) {
+  return <section className="panel" aria-labelledby="project-selection-title"><PanelHeading eyebrow="SAVED PROJECT DATA" title="Project selection" chip="PREVIEW" /><form className="project-form" method="get"><label htmlFor="project-code">Kode project</label><input id="project-code" name="code" defaultValue={code} placeholder="Contoh: BRU-01" maxLength={20} required /><label htmlFor="project-name">Nama project</label><input id="project-name" name="name" defaultValue={name} placeholder="Contoh: Kantor Camat" maxLength={120} required /><button type="submit">Validasi &amp; preview</button></form>{preview === null && <EmptyState title="Belum ada preview" detail="Isi kode dan nama untuk validasi domain tanpa mutation." />}{preview && preview.ok && <div className="success-state" role="status"><span className="severity-tag success">SUCCESS</span><h3>{preview.data.project.name}</h3><dl className="data-list"><div><dt>Kode</dt><dd>{preview.data.project.code}</dd></div><div><dt>State</dt><dd>{preview.data.state}</dd></div><div><dt>Fingerprint</dt><dd><code>{preview.data.previewFingerprint}</code></dd></div></dl><p>Preview tidak membuat project, context, execution, atau audit row.</p><div className="action-row"><button type="button" onClick={() => void onMutate("create_project", { code: preview.data.project.code, name: preview.data.project.name })}>Create saved project</button><button type="button" className="secondary-button" onClick={() => onAction("Active project hanya berganti melalui SelectActiveProjectUseCase.")}>Select active project</button></div></div>}{preview && !preview.ok && <div className="error-state" role="alert"><span className="severity-tag error">ERROR</span><h3>Preview ditolak</h3><p>{preview.message}</p></div>}</section>;
 }
 
 function RabWorkspace({ status, onStatus, onAction }: { status: Status; onStatus: (status: Status) => void; onAction: (message: string) => void }) {

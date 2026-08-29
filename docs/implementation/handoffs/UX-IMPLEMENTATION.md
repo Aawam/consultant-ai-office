@@ -1,7 +1,7 @@
 # UX Implementation Handoff — Phase 0–1
 
 **Workstream:** UX Implementation Engineer
-**Status:** NOT READY — UX IMPLEMENTATION BLOCKERS REMAIN
+**Status:** READY FOR EXCEL EXPORTER
 
 ## 1. Authority and baseline
 
@@ -49,7 +49,7 @@ office-web
           → pg/PostgreSQL
 ```
 
-`createOfficeRuntime()` constructs one pool, project adapters, RAB adapters, master-data snapshot adapter, clock, ID generator, project use cases, and RAB lifecycle use cases. It contains no business rules. `office-web` does not import Infrastructure, Drizzle, or PostgreSQL.
+`createOfficeRuntime()` constructs one pool, project adapters, RAB adapters, master-data snapshot adapter, clock, ID generator, project use cases, and RAB lifecycle use cases. It contains no business rules. `office-web` does not import Infrastructure, Drizzle, or PostgreSQL. The browser delivery route is `apps/office-web/app/api/workflow/route.ts`.
 
 | Use case | Actual | Evidence |
 |---|---|---|
@@ -59,7 +59,7 @@ office-web
 | `GetActiveProjectHistoryUseCase` | Constructed by `office-runtime` | `packages/office-runtime/src/index.ts` |
 | `createProjectDeliveryFromRuntime` | Delivery uses `runtime.projects.create` | `apps/office-web/app/project-delivery.ts` |
 
-The UI does not import Infrastructure, Drizzle, PostgreSQL, or perform direct persistence. Buttons for unavailable operations report the missing composition boundary instead of claiming success.
+The UI does not import Infrastructure, Drizzle, PostgreSQL, or perform direct persistence. Every consequential browser action POSTs to the delivery route and then performs a GET reload through the runtime/Application path.
 
 ## 5. UX coverage
 
@@ -96,13 +96,22 @@ The UI does not import Infrastructure, Drizzle, PostgreSQL, or perform direct pe
 | RT-02 | RAB persistence | DRAFT → REVIEW → FINAL → revision survives reload | FINAL and revision persisted/reloaded through runtime | PASS | `tests/integration/office-runtime-composition.test.ts` |
 | RT-03 | Authorization | Application remains security boundary | Invalid technical FINAL attempt rejected | PASS | `tests/integration/office-runtime-composition.test.ts` |
 | RT-04 | Atomicity | Failed transaction rolls back | Existing RAB rollback integration passed | PASS | `tests/integration/postgres-rab-workflow.test.ts` |
+| DEL-01 | Browser/server delivery | Route invokes office-runtime | `POST /api/workflow` invokes composed runtime | PASS | `tests/integration/office-workflow-delivery.test.ts`; localhost HTTP run |
+| DEL-02 | DRAFT persistence | Create DRAFT survives request boundary | DRAFT returned and persisted | PASS | delivery test |
+| DEL-03 | REVIEW reload | REVIEW survives fresh GET | Reload returned `status: REVIEW` and warning evidence | PASS | delivery test; localhost HTTP run |
+| DEL-04 | Authorization | TECHNICAL cannot FINAL | HTTP 403 `FORBIDDEN` | PASS | delivery test; localhost HTTP run |
+| DEL-05 | FINAL persistence | ADMIN FINAL persists | HTTP 200 and `status: FINAL` | PASS | delivery test |
+| DEL-06 | FINAL reload | FINAL survives fresh GET | Reload returned `status: FINAL` | PASS | delivery test; localhost HTTP run |
+| DEL-07 | Revision | FINAL preserved, new DRAFT created | Revision 2 returned and reloaded as DRAFT | PASS | delivery test; localhost HTTP run |
+| DEL-08 | Validation failure | Invalid request cannot show false success | Missing project returned HTTP 422 `VALIDATION_ERROR` | PASS | delivery test |
+| DEL-09 | Boundary | office-web has no direct DB dependency | Boundary script passes for 8 modules | PASS | `pnpm lint`, `pnpm boundaries` |
 
 ## 7. Known limitations and blockers
 
-1. The runtime composition root is now available, but the current page still exposes only the original project preview; wiring every browser mutation to server-side runtime handlers is a follow-up delivery slice.
+1. Authentication/session acquisition remains outside this Phase 0–1 slice; the delivery route currently derives the local demo role from `x-office-role`. Application authorization still rejects forbidden actions.
 2. Production Excel exporter is not implemented. No export success is faked.
 3. The historical PostgreSQL cluster on port `55433` was not modified. Tests used a separate disposable PostgreSQL 15.13 cluster on port `55434`.
-4. No browser/axe runtime test harness is configured in this repository.
+4. Chrome DevTools MCP/axe is not configured; browser-facing verification used a localhost-only Next server plus HTTP route flow and the delivery integration test.
 
 ## 8. Deferred functionality
 
@@ -114,11 +123,14 @@ Excel/PDF output implementation, Phase 2–5 features, arbitrary formula editing
 - `apps/office-web/app/office-workspace.tsx`
 - `apps/office-web/app/styles.css`
 - `apps/office-web/app/project-delivery.ts`
+- `apps/office-web/app/api/workflow/route.ts`
+- `apps/office-web/next.config.ts`
 - `apps/office-web/package.json`
 - `packages/office-runtime/package.json`
 - `packages/office-runtime/tsconfig.json`
 - `packages/office-runtime/src/index.ts`
 - `tests/integration/office-runtime-composition.test.ts`
+- `tests/integration/office-workflow-delivery.test.ts`
 - `scripts/check-boundaries.mjs`
 - `vitest.config.ts`
 - `pnpm-lock.yaml`
@@ -126,6 +138,6 @@ Excel/PDF output implementation, Phase 2–5 features, arbitrary formula editing
 
 ## 10. Commit and recommendation
 
-Implementation commit: `14f2bc2` (`feat: add application composition runtime`). The composition-root and integration gates are green. Excel exporter was not started.
+Implementation commits: `14f2bc2` (`feat: add application composition runtime`) and the browser delivery wiring commit created for this handoff. Composition, delivery, and regression gates are green. Excel exporter was not started.
 
-**NOT READY — UX IMPLEMENTATION BLOCKERS REMAIN**
+**READY FOR EXCEL EXPORTER**

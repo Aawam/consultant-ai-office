@@ -35,6 +35,7 @@ export interface OfficeRuntime {
     readonly history: GetActiveProjectHistoryUseCase;
   };
   readonly rab: {
+    readonly get: (rabVersionId: string) => Promise<import("@consultant-ai-office/domain").RabVersion | null>;
     readonly createDraft: CreateRabDraftUseCase;
     readonly submitReview: SubmitRabForReviewUseCase;
     readonly returnToDraft: ReturnRabToDraftUseCase;
@@ -65,6 +66,7 @@ export function createOfficeRuntime(options: OfficeRuntimeOptions): OfficeRuntim
     pool,
     projects: { create, list: queries, getActive, select, history },
     rab: {
+      get: rabAdapters.rabs.get,
       createDraft: new CreateRabDraftUseCase(rabAdapters.rabs, rabAdapters.transaction, clock, ids, snapshots),
       submitReview: new SubmitRabForReviewUseCase(rabAdapters.rabs, rabAdapters.transaction, clock),
       returnToDraft: new ReturnRabToDraftUseCase(rabAdapters.rabs, rabAdapters.transaction, clock),
