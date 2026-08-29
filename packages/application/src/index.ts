@@ -1,5 +1,3 @@
-import type { RequestContext } from "@consultant-ai-office/domain";
-
 export type { RequestContext } from "@consultant-ai-office/domain";
 export type {
   ActorRole,
@@ -11,16 +9,34 @@ export type {
 export interface ApplicationUseCase<Request, Response> {
   execute(context: RequestContext, request: Request): Promise<Response>;
 }
+import type { RequestContext } from "@consultant-ai-office/domain";
 
-export interface AuditRecordDraft {
-  readonly eventName: string;
-  readonly requestId: string;
-  readonly projectId: string;
-  readonly actorId: string;
-  readonly occurredAt: Date;
-  readonly sanitizedSummary: Readonly<Record<string, unknown>>;
-}
-
-export interface AuditPort {
-  append(record: AuditRecordDraft): Promise<void>;
-}
+export { ApplicationError, type ApplicationErrorCode } from "./errors";
+export { RoleAuthorizationPolicy } from "./authorization";
+export {
+  assertWriteApproved,
+  projectPreviewFingerprint,
+  type HumanConfirmation,
+  type WriteInitiation,
+} from "./project-approval";
+export {
+  type ActiveProjectContextRepository,
+  type AuditPort,
+  type AuditRecordDraft,
+  type ExecutionHistoryPort,
+  type ExecutionRecordDraft,
+  type ExecutionResult,
+  type IdGeneratorPort,
+  type ProjectMembershipRepository,
+  type ProjectRepository,
+  type ProjectUnitOfWork,
+  type ProjectWriteDependencies,
+  type TransactionPort,
+} from "./project-ports";
+export {
+  CreateProjectUseCase,
+  cancelProjectCreation,
+  previewProjectCreation,
+  type CreateProjectRequest,
+  type CreateProjectResponse,
+} from "./project-create";

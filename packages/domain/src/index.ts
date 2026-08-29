@@ -12,7 +12,7 @@ export interface ActorIdentity {
 
 export interface RequestContext {
   readonly requestId: string;
-  readonly projectId: string;
+  readonly projectId: string | null;
   readonly actor: ActorIdentity;
 }
 
@@ -24,3 +24,13 @@ export interface VersionState {
   readonly versionId: string;
   readonly status: DocumentStatus;
 }
+
+export {
+  DomainValidationError,
+  createProjectDraft,
+  type ActiveProjectContext,
+  type Project,
+  type ProjectDraft,
+  type ProjectDraftInput,
+  type ProjectMembership,
+} from "./project";
