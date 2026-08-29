@@ -2,6 +2,7 @@
 
 **Status:** NOT READY — EXCEL EXPORTER BLOCKERS REMAIN
 **Baseline commits:** `c7b3b05`, `05954ec`
+**Delta commits:** `17d4ad1`, `c746e6a`
 **Scope:** Phase 1 formula-active RAB/EE Excel export only. PDF and Phase 2–5 remain deferred.
 
 ## Sources read
@@ -36,7 +37,7 @@ Authorization and lifecycle checks are in Application Layer. REVIEW and FINAL re
 
 Critical arithmetic remains in the P1 deterministic engine. The workbook exposes formula chains and uses decimal text for snapshot values. Stable project/RAB/item/HSP/component/resource identifiers are carried where present in the persisted snapshot.
 
-The current persisted Phase 1 model does not yet expose a complete BV line/template snapshot or dedicated artifact database record. The adapter therefore emits the required `BV` table shape but cannot claim full GT-01–GT-12 BV export coverage. Unit canonicalization must also be resolved before export by the source snapshot; Infrastructure does not import the calculation engine.
+The persisted Phase 1 model now exposes a complete export snapshot DTO and dedicated artifact database record. Full GT-01–GT-12 numeric/output coverage is still pending. Unit canonicalization must be resolved before export by the source snapshot; Infrastructure does not import the calculation engine.
 
 ## Test matrix
 
