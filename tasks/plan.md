@@ -43,9 +43,9 @@ Implement the in-memory deterministic Phase 1 calculation boundary from the cano
 ### Phase 3: Quality and handoff
 
 - [x] Verify engine purity and package boundaries.
-- [ ] Run lint, typecheck, test, build, and boundaries on the final change.
-- [ ] Write `docs/implementation/handoffs/P1-CORE-GOLDEN.md` with actual evidence and recommendation.
-- [ ] Commit the verified implementation and handoff with traceable hashes.
+- [x] Run lint, typecheck, test, build, and boundaries on the final change.
+- [x] Write `docs/implementation/handoffs/P1-CORE-GOLDEN.md` with actual evidence and recommendation.
+- [x] Commit the verified implementation and handoff with traceable hashes.
 
 ## Risks and Mitigations
 

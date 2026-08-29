@@ -49,8 +49,8 @@
 
 **Acceptance criteria:**
 
-- [ ] `lint`, `typecheck`, `test`, `build`, and `boundaries` have current PASS evidence.
-- [ ] P1 handoff records scope, decimal strategy, GT matrix, contract tests, repeatability, differences, limitations, files, hash, and recommendation.
+- [x] `lint`, `typecheck`, `test`, `build`, and `boundaries` have current PASS evidence.
+- [x] P1 handoff records scope, decimal strategy, GT matrix, contract tests, repeatability, differences, limitations, files, hash, and recommendation.
 
 **Verification:** clean review of git diff, command output, and handoff.
 
