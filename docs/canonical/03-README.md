@@ -1,7 +1,7 @@
 # Consultant AI Office — Canonical Document Index
 
-**Status:** ACTIVE  
-**Last updated:** 2026-08-28  
+**Status:** ACTIVE
+**Last updated:** 2026-08-29
 
 README ini adalah pintu masuk untuk menentukan dokumen mana yang berlaku. Jumlah dokumen bukan penentu authority; status dan urutan di bawah yang berlaku.
 
@@ -48,6 +48,15 @@ D-023 dan D-024 mengalahkan baseline lama yang masih berhenti pada D-022. D-025 
 | `12-excel-output-contract.md` | **FINAL FOR IMPLEMENTATION** |
 | `13-manager-integration-closeout.md` | Bukti A–B–C Integration Gate CLOSED |
 
+## 3a. UX Canonical Source
+
+| Dokumen | Kedudukan |
+|---|---|
+| `../ux/UX-STRUCTURE-P0-P1.md` | **UX STRUCTURE READY FOR IMPLEMENTATION**; authority untuk information architecture, interaction model, dan state presentation |
+
+UX tidak mengalahkan canonical business, architecture, lifecycle, authorization,
+validation, persistence, calculation, atau export contract.
+
 Nomor file adalah identifier historis, bukan tingkat authority. Karena itu dua dokumen bernomor `08` tetap dapat hidup berdampingan selama nama dan kedudukannya berbeda jelas.
 
 ## 4. Reference Data Aktif
@@ -91,6 +100,23 @@ Folder `archive/duplicates/` berisi salinan byte-identik atau upload ganda. Fold
 
 Dokumen arsip tidak boleh digunakan sebagai authority. Jika isi historis diperlukan, selalu rekonsiliasi terhadap indeks ini dan dokumen kanonik terbaru.
 
-## 8. North Star
+Audit 2026-08-29 tidak menemukan dokumen superseded tambahan yang aman untuk
+dipindahkan. Folder `docs/archive/superseded/` disediakan untuk perpindahan
+berikutnya; file pengguna yang masih untracked tidak dipindahkan atau dihapus.
+
+## 8. Current Gate
+
+**NOT READY — UX IMPLEMENTATION BLOCKERS REMAIN.**
+
+P0–P1 integration evidence tersedia dan berstatus siap untuk UX, tetapi
+`docs/implementation/handoffs/UX-IMPLEMENTATION.md` secara eksplisit mencatat
+bahwa workflow browser belum terbukti end-to-end untuk semua jalur persistence
+dan masih memiliki blocker. Karena itu repository belum boleh menyatakan UX
+implementation atau Phase 0/1 final/accepted.
+
+Handoff, bukan index, menjadi sumber status eksekusi; index ini hanya merangkum
+status tersebut agar tidak ada klaim readiness yang lebih tinggi dari bukti.
+
+## 9. North Star
 
 > Satu data proyek digunakan kembali secara konsisten oleh proses teknis dan administratif tanpa input berulang yang tidak perlu, dengan human review pada keputusan dan output penting.
