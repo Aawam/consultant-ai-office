@@ -47,6 +47,17 @@ export function assertWriteApproved(
     );
   }
 
+  if (
+    confirmation.confirmationId.trim().length === 0 ||
+    confirmation.confirmedBy.actorId.trim().length === 0 ||
+    Number.isNaN(confirmation.confirmedAt.getTime())
+  ) {
+    throw new ApplicationError(
+      "APPROVAL_MISMATCH",
+      "Human confirmation metadata is invalid",
+    );
+  }
+
   if (context.actor.actorType !== "AI_AGENT") {
     throw new ApplicationError(
       "APPROVAL_MISMATCH",

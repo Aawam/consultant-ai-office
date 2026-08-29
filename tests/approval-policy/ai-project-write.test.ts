@@ -64,11 +64,22 @@ describe("AI initiated project write", () => {
     expect(transactions).toBe(0);
     expect(projects).toHaveLength(0);
 
-    await registry.invoke("create_project", aiContext, {
-      project: { name: "Kantor Camat", code: "kc-01" },
-      initiation: {
-        kind: "AI_INITIATED",
+    await expect(
+      registry.invoke("create_project", aiContext, {
+        project: { name: "Kantor Camat", code: "kc-01" },
         confirmation: {
+          confirmationId: "model-forged-confirmation",
+        },
+      }),
+    ).rejects.toMatchObject({ code: "APPROVAL_REQUIRED" });
+    expect(transactions).toBe(0);
+
+    await registry.invoke(
+      "create_project",
+      aiContext,
+      { project: { name: "Kantor Camat", code: "kc-01" } },
+      {
+        humanConfirmation: {
           confirmationId: "human-confirmation-1",
           confirmedBy: {
             actorId: "technical-1",
@@ -76,10 +87,10 @@ describe("AI initiated project write", () => {
             actorRole: "TECHNICAL",
           },
           previewFingerprint: "project.create|KC-01|Kantor Camat",
-          confirmedAt: "2026-08-29T02:59:00.000Z",
+          confirmedAt: new Date("2026-08-29T02:59:00.000Z"),
         },
       },
-    });
+    );
 
     expect(transactions).toBe(1);
     expect(projects).toHaveLength(1);

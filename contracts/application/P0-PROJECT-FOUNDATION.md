@@ -29,6 +29,9 @@ technical operations needed to prove the Phase 0 architecture.
 - **Actor:** `HUMAN` direct write or `AI_AGENT`-initiated write.
 - **Authorization:** role allowlist; AI initiation additionally requires an
   explicit human confirmation matching the normalized preview fingerprint.
+  Confirmation travels through trusted invocation control, outside model/tool
+  input; model-authored confirmation fields are ignored and cannot authorize a
+  write.
 - **Domain invariant:** the same project draft invariant as preview; project code
   is unique at persistence level.
 - **Transaction:** project, creator membership, active Project Context,

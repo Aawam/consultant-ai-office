@@ -1,10 +1,7 @@
 import {
   ApplicationError,
   previewProjectCreation,
-  type ActorIdentity,
-  type CreateProjectRequest,
   type CreateProjectUseCase,
-  type HumanConfirmation,
 } from "@consultant-ai-office/application";
 
 import type { ControlledToolAdapter } from "./index";
@@ -28,68 +25,6 @@ function parseProject(input: unknown): { name: string; code: string } {
   return {
     name: text(project.name, "project.name"),
     code: text(project.code, "project.code"),
-  };
-}
-
-function parseHumanActor(input: unknown): ActorIdentity {
-  const actor = record(input, "confirmation.confirmedBy");
-  const actorType = text(actor.actorType, "confirmation.confirmedBy.actorType");
-  const actorRole = text(actor.actorRole, "confirmation.confirmedBy.actorRole");
-  if (
-    actorType !== "HUMAN" ||
-    (actorRole !== "TECHNICAL" && actorRole !== "ADMIN")
-  ) {
-    throw new ApplicationError("VALIDATION_ERROR", "Invalid human confirmer");
-  }
-  return {
-    actorId: text(actor.actorId, "confirmation.confirmedBy.actorId"),
-    actorType,
-    actorRole,
-  };
-}
-
-function parseConfirmation(input: unknown): HumanConfirmation {
-  const confirmation = record(input, "confirmation");
-  const confirmedAtText = text(
-    confirmation.confirmedAt,
-    "confirmation.confirmedAt",
-  );
-  const confirmedAt = new Date(confirmedAtText);
-  if (Number.isNaN(confirmedAt.getTime())) {
-    throw new ApplicationError(
-      "VALIDATION_ERROR",
-      "Invalid confirmation.confirmedAt",
-    );
-  }
-  return {
-    confirmationId: text(
-      confirmation.confirmationId,
-      "confirmation.confirmationId",
-    ),
-    confirmedBy: parseHumanActor(confirmation.confirmedBy),
-    previewFingerprint: text(
-      confirmation.previewFingerprint,
-      "confirmation.previewFingerprint",
-    ),
-    confirmedAt,
-  };
-}
-
-function parseCreateRequest(input: unknown): CreateProjectRequest {
-  const request = record(input, "tool input");
-  const initiation = record(request.initiation, "initiation");
-  if (initiation.kind !== "AI_INITIATED") {
-    throw new ApplicationError(
-      "APPROVAL_REQUIRED",
-      "Controlled AI writes require AI initiation and human confirmation",
-    );
-  }
-  return {
-    project: parseProject(request.project),
-    initiation: {
-      kind: "AI_INITIATED",
-      confirmation: parseConfirmation(initiation.confirmation),
-    },
   };
 }
 
@@ -123,7 +58,7 @@ export function createProjectControlledTools(dependencies: {
         permission: ["TECHNICAL", "ADMIN"],
         inputSchema: {
           type: "object",
-          required: ["project", "initiation"],
+          required: ["project"],
         },
         outputSchema: { type: "object" },
         requiresApproval: true,
@@ -131,8 +66,21 @@ export function createProjectControlledTools(dependencies: {
         idempotencyPolicy: "reject_duplicate_request_id",
         timeoutPolicy: "fail_closed",
       },
-      execute: (context, input) =>
-        dependencies.createProject.execute(context, parseCreateRequest(input)),
+      execute: (context, input, control) => {
+        if (!control.humanConfirmation) {
+          throw new ApplicationError(
+            "APPROVAL_REQUIRED",
+            "Controlled AI writes require out-of-band human confirmation",
+          );
+        }
+        return dependencies.createProject.execute(context, {
+          project: parseProject(record(input, "tool input").project),
+          initiation: {
+            kind: "AI_INITIATED",
+            confirmation: control.humanConfirmation,
+          },
+        });
+      },
     },
   ];
 }

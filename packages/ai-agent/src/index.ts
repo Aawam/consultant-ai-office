@@ -1,5 +1,6 @@
 import {
   ApplicationError,
+  type HumanConfirmation,
   type RequestContext,
 } from "@consultant-ai-office/application";
 import type {
@@ -9,16 +10,25 @@ import type {
 
 export interface ControlledToolAdapter<Input = unknown, Output = unknown> {
   readonly definition: ControlledToolContract;
-  execute(context: RequestContext, input: Input): Promise<Output>;
+  execute(
+    context: RequestContext,
+    input: Input,
+    control: ControlledToolInvocationControl,
+  ): Promise<Output>;
+}
+
+export interface ControlledToolInvocationControl {
+  readonly humanConfirmation?: HumanConfirmation;
 }
 
 export interface ControlledToolRegistry {
-  get(name: string): ControlledToolAdapter | undefined;
+  get(name: string): ControlledToolContract | undefined;
   list(): readonly ControlledToolContract[];
   invoke(
     name: string,
     context: RequestContext,
     input: unknown,
+    control?: ControlledToolInvocationControl,
   ): Promise<unknown>;
 }
 
@@ -112,9 +122,14 @@ export function createControlledToolRegistry(
   }
 
   return Object.freeze({
-    get: (name: string) => byName.get(name),
+    get: (name: string) => byName.get(name)?.definition,
     list: () => [...byName.values()].map((tool) => tool.definition),
-    invoke: async (name: string, context: RequestContext, input: unknown) => {
+    invoke: async (
+      name: string,
+      context: RequestContext,
+      input: unknown,
+      control: ControlledToolInvocationControl = {},
+    ) => {
       const tool = byName.get(name);
       if (!tool) {
         throw new ApplicationError("NOT_FOUND", "Controlled tool is not registered");
@@ -129,7 +144,13 @@ export function createControlledToolRegistry(
         );
       }
       validateInput(name, tool.definition.inputSchema, input);
-      return tool.execute(context, input);
+      if (tool.definition.requiresApproval && !control.humanConfirmation) {
+        throw new ApplicationError(
+          "APPROVAL_REQUIRED",
+          "Controlled write requires out-of-band human confirmation",
+        );
+      }
+      return tool.execute(context, input, control);
     },
   });
 }

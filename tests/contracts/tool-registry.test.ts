@@ -109,4 +109,29 @@ describe("controlled AI tool registry", () => {
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
     expect(executions).toBe(0);
   });
+
+  it("does not expose executable adapters outside registry enforcement", () => {
+    const registry = createControlledToolRegistry([
+      {
+        definition: {
+          name: "get_project",
+          description: "Read a project through an application use case",
+          mode: "read",
+          permission: ["TECHNICAL"],
+          inputSchema: {},
+          outputSchema: {},
+          requiresApproval: false,
+          auditEvent: "project.read",
+          idempotencyPolicy: "safe_retry",
+          timeoutPolicy: "fail_closed",
+        },
+        execute: async () => ({}),
+      },
+    ]);
+
+    expect(registry.get("get_project")).toEqual(
+      expect.objectContaining({ name: "get_project", mode: "read" }),
+    );
+    expect(registry.get("get_project")).not.toHaveProperty("execute");
+  });
 });
