@@ -11,7 +11,7 @@ import {
   calculateRabItem,
   type AhspComponentInput,
 } from "@consultant-ai-office/rab-calculation-engine";
-import { goldenAhspCases, goldenBvCases, goldenRabCases } from "../../fixtures/golden-reference/rab-ee-golden";
+import { goldenAhspCases, goldenRabCases } from "../../fixtures/golden-reference/rab-ee-golden";
 
 const generatedAt = new Date("2026-08-31T00:00:00.000Z");
 const outputDir = join(process.cwd(), "outputs", "phase-1a-golden");
@@ -54,7 +54,7 @@ const rab: RabVersion = {
   status: "DRAFT",
   ohProfitRate: goldenAhspCases.gt07.ohProfitRate,
   ppnRate: goldenRabCases.gt09.ppnRate,
-  items: [{ itemId: "gt09-item-1", description: "Pekerjaan tanah — GT-09", volume: volumeOracle, volumeUnitRaw: "m3", volumeSource: { kind: "BACKUP_VOLUME", bvReferenceId: "gt09-bv" }, hsp: { kind: "OFFICIAL_AHSP", unitRaw: "m3", hspId: "gt07-hsp" } }],
+  items: [{ itemId: "gt09-item-1", description: "Pekerjaan tanah — GT-09", volume: volumeOracle, volumeUnitRaw: "m3", volumeSource: { kind: "BACKUP_VOLUME", bvReferenceId: "gt09-bv" }, hspId: "gt07-hsp", hsp: { kind: "OFFICIAL_AHSP", unitRaw: "m3", hspId: "gt07-hsp" } }],
   validation: { issues: [], reviewBlocked: false },
   calculationSnapshot: { calculatedAt: generatedAt, itemValues: { "gt09-item-1": itemOracle.itemValue }, totals: totalsOracle, exportSnapshot: snapshot },
   confirmedWarningCodes: [], createdBy: "golden-fixture", createdAt: generatedAt, updatedAt: generatedAt,

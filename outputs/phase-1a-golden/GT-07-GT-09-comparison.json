@@ -1,0 +1,30 @@
+{
+  "generatedAt": "2026-08-31T00:00:00.000Z",
+  "snapshotId": "golden-snapshot-gt07-gt09-v1",
+  "workbook": "/Users/awam/Documents/Work/Consultant/Projects/consultant-ai-office/outputs/phase-1a-golden/GT-07-GT-09-working.xlsx",
+  "checks": {
+    "label": "NOT OFFICIAL",
+    "formulas": "PASS",
+    "formulaErrors": [],
+    "item": {
+      "expected": "11436371.3178",
+      "actual": "11436371.3178"
+    },
+    "volume": {
+      "expected": "74.3535",
+      "actual": "74.3535"
+    },
+    "hsp": {
+      "expected": "153810.8",
+      "actual": "153810.8"
+    },
+    "totals": {
+      "subtotalRab": "11436371.3178",
+      "ppnRate": "0.11",
+      "ppnValue": "1258000.844958",
+      "totalBeforeRounding": "12694372.162758",
+      "totalFinal": "12694000",
+      "roundingDifference": "-372.162758"
+    }
+  }
+}
