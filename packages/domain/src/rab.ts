@@ -16,6 +16,7 @@ export interface RabBvSnapshotLine {
   readonly formulaTemplateKey: string;
   readonly formulaTemplateVersion: string;
   readonly formulaDisplay: string;
+  readonly formulaExpression?: string;
   readonly unitRaw: string;
   readonly unitCanonical: string;
   readonly volumeCalc: string;
@@ -38,6 +39,12 @@ export interface RabHspSnapshot {
   readonly manualDescription: string | null;
   readonly manualHsp: string | null;
   readonly manualNote: string | null;
+  readonly laborSubtotal?: string;
+  readonly materialSubtotal?: string;
+  readonly equipmentSubtotal?: string;
+  readonly directCost?: string;
+  readonly ohValue?: string;
+  readonly hspValue?: string;
 }
 
 export interface RabComponentSnapshot {
@@ -56,6 +63,7 @@ export interface RabComponentSnapshot {
   readonly priceValue: string | null;
   readonly priceState: "MISSING" | "SET" | "ZERO_CONFIRMED";
   readonly sourceLocator: string | null;
+  readonly componentCost?: string;
 }
 
 export interface RabResourceSnapshot {
