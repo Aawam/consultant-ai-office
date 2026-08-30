@@ -4,6 +4,8 @@ Status: **NOT READY — GOLDEN OUTPUT VALIDATION REMAINS**
 
 The automated golden-output checks are green. Phase 1A approval is still blocked until a civil-technical validator records a substantive review and sign-off. This document does not declare official or final exporter acceptance.
 
+Presentation-correction implementation commit: `8aacaf861e0adf4cd3bb971bfdda02acc476c367`.
+
 ## Golden input and authority
 
 One official source-backed context was used:
@@ -19,6 +21,7 @@ The canonical Excel contract is [docs/canonical/12-excel-output-contract.md](../
 
 - [GT-07-GT-09-working.xlsx](../../../outputs/phase-1a-golden/GT-07-GT-09-working.xlsx) — generated working workbook, label `NOT OFFICIAL`, snapshot `golden-snapshot-gt07-gt09-v1`.
 - [GT-07-GT-09-comparison.json](../../../outputs/phase-1a-golden/GT-07-GT-09-comparison.json) — machine-readable comparison and formula-error scan.
+- [VISUAL-PARITY-REVIEW.md](../../../outputs/phase-1a-golden/VISUAL-PARITY-REVIEW.md) — side-by-side source/candidate inspection and intentional-deviation register.
 - Visual inspection: [REKAP](../../../outputs/phase-1a-golden/visual-inspection/rekap.png), [RAB](../../../outputs/phase-1a-golden/visual-inspection/rab.png), [BV](../../../outputs/phase-1a-golden/visual-inspection/bv.png), [ANALISA HSP](../../../outputs/phase-1a-golden/visual-inspection/analisa-hsp.png), and [HARGA DASAR](../../../outputs/phase-1a-golden/visual-inspection/harga-dasar.png).
 
 ## Phase 1A presentation correction
