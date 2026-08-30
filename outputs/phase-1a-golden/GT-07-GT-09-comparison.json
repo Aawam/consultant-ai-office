@@ -6,6 +6,25 @@
     "label": "NOT OFFICIAL",
     "formulas": "PASS",
     "formulaErrors": [],
+    "externalLinks": "ABSENT",
+    "macros": "ABSENT",
+    "presentation": {
+      "visibleSheets": [
+        "REKAP",
+        "RAB",
+        "BV",
+        "ANALISA HSP",
+        "HARGA DASAR"
+      ],
+      "hiddenTraceabilitySheets": [
+        "PROJECT",
+        "AHSP_COMPONENTS",
+        "HSP_MAPPING",
+        "CHECKS"
+      ],
+      "rawTechnicalIdsVisible": false,
+      "visualInspection": "outputs/phase-1a-golden/visual-inspection"
+    },
     "item": {
       "expected": "11436371.3178",
       "actual": "11436371.3178"

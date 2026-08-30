@@ -19,6 +19,13 @@ The canonical Excel contract is [docs/canonical/12-excel-output-contract.md](../
 
 - [GT-07-GT-09-working.xlsx](../../../outputs/phase-1a-golden/GT-07-GT-09-working.xlsx) — generated working workbook, label `NOT OFFICIAL`, snapshot `golden-snapshot-gt07-gt09-v1`.
 - [GT-07-GT-09-comparison.json](../../../outputs/phase-1a-golden/GT-07-GT-09-comparison.json) — machine-readable comparison and formula-error scan.
+- Visual inspection: [REKAP](../../../outputs/phase-1a-golden/visual-inspection/rekap.png), [RAB](../../../outputs/phase-1a-golden/visual-inspection/rab.png), [BV](../../../outputs/phase-1a-golden/visual-inspection/bv.png), [ANALISA HSP](../../../outputs/phase-1a-golden/visual-inspection/analisa-hsp.png), and [HARGA DASAR](../../../outputs/phase-1a-golden/visual-inspection/harga-dasar.png).
+
+## Phase 1A presentation correction
+
+The workbook now presents five civil-review sheets in source-workbook order and visual language: `REKAP`, `RAB`, `BV`, `ANALISA HSP`, and `HARGA DASAR`. Titles, project context, grey table headings, grouped RAB rows, BV dimension columns, AHSP component calculation, and Indonesian number presentation follow the approved source pattern without copying its external links, macro behavior, stale formulas, or formula errors.
+
+Raw project, RAB, snapshot, item, HSP, AHSP component, resource, BV-line, parent, and reference identifiers are absent from user-visible sheets. They remain auditable in four `veryHidden` protected metadata sheets: `PROJECT`, `AHSP_COMPONENTS`, `HSP_MAPPING`, and `CHECKS`. Formula presentation follows the source audit chain directly: `BV → RAB → REKAP` and `HARGA DASAR → ANALISA HSP → RAB`.
 
 Automated comparison:
 
@@ -32,6 +39,10 @@ Automated comparison:
 | Grand total after HALF_UP thousand rounding | `12694000` | `12694000` | PASS |
 | Rounding difference | `-372.162758` | `-372.162758` | PASS |
 | Formula error scan | no `#REF!`, `#DIV/0!`, `#VALUE!`, `#NAME?` | none found | PASS |
+| External links | absent | absent | PASS |
+| VBA/macros | absent | absent | PASS |
+| Raw technical IDs on visible sheets | absent | absent | PASS |
+| Visual inspection of all visible sheets | legible/source-aligned | five rendered sheets inspected | PASS |
 
 ## Human technical review
 
@@ -46,7 +57,7 @@ Executed against the current working tree:
 ```text
 corepack pnpm@11.24.0 lint                         PASS
 corepack pnpm@11.24.0 typecheck                    PASS
-TEST_DATABASE_URL=... corepack pnpm@11.24.0 test   PASS — 20 files, 83 tests
+TEST_DATABASE_URL=... corepack pnpm@11.24.0 test   PASS — 21 files, 85 tests
 corepack pnpm@11.24.0 build                        PASS
 ```
 

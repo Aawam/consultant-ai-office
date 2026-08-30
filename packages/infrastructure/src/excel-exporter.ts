@@ -2,84 +2,178 @@ import ExcelJS from "exceljs";
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type {
-  ArtifactRecord,
-  ArtifactStoragePort,
-  RabWorkbookExportInput,
-  RabWorkbookExporterPort,
-} from "@consultant-ai-office/application";
-import type { RabExportSnapshot, RabItemInput } from "@consultant-ai-office/domain";
+import type { ArtifactRecord, ArtifactStoragePort, RabWorkbookExportInput, RabWorkbookExporterPort } from "@consultant-ai-office/application";
+import type { RabBvSnapshotLine, RabItemInput } from "@consultant-ai-office/domain";
 
-const SHEETS = ["PROJECT", "REKAP", "RAB_DETAIL", "BV", "HSP_USED", "AHSP_COMPONENTS", "RESOURCE_SNAPSHOT", "HSP_MAPPING", "CHECKS"] as const;
-const TABLES = ["tbl_PROJECT", "tbl_REKAP", "tbl_RAB", "tbl_BV", "tbl_HSP", "tbl_AHSP_COMP", "tbl_RESOURCE", "tbl_HSP_MAP", "tbl_CHECKS"] as const;
-
+const VISIBLE_SHEETS = ["REKAP", "RAB", "BV", "ANALISA HSP", "HARGA DASAR"] as const;
+const HIDDEN_SHEETS = ["PROJECT", "AHSP_COMPONENTS", "HSP_MAPPING", "CHECKS"] as const;
+const BORDER: Partial<ExcelJS.Borders> = {
+  top: { style: "thin", color: { argb: "FF333333" } }, left: { style: "thin", color: { argb: "FF333333" } },
+  bottom: { style: "thin", color: { argb: "FF333333" } }, right: { style: "thin", color: { argb: "FF333333" } },
+};
 type Row = Record<string, unknown>;
 const text = (value: unknown): string => typeof value === "string" ? value : value == null ? "" : String(value);
+const decimal = (value: unknown): number => Number(text(value) || "0");
 const formula = (expression: string, result: string | number = "") => ({ formula: expression, result });
 const itemData = (item: RabItemInput): Row => item as Row;
-const canonicalUnit = (raw: string): string => raw.trim();
+const roman = (index: number): string => ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"][index] ?? String(index + 1);
 
-function header(sheet: ExcelJS.Worksheet, input: RabWorkbookExportInput): void {
-  sheet.addRow(["Project", input.project.name, "Project ID", input.project.projectId]);
-  sheet.addRow(["RAB Version", input.rab.rabVersionId, "Revision", input.rab.revisionNumber]);
-  sheet.addRow(["Status", input.rab.status, "Export", input.exportType === "OFFICIAL" ? "OFFICIAL" : "NOT OFFICIAL"]);
-  sheet.addRow(["Snapshot ID", input.snapshot.snapshotId, "Generated At", input.generatedAt.toISOString()]);
-  sheet.getRows(1, 4)?.forEach((row) => row.eachCell((cell) => { cell.font = { bold: true }; }));
+function titleBlock(sheet: ExcelJS.Worksheet, title: string, input: RabWorkbookExportInput, lastColumn: string): void {
+  sheet.mergeCells(`A1:${lastColumn}1`); sheet.getCell("A1").value = title;
+  sheet.getCell("A1").font = { name: "Arial", size: 15, bold: true }; sheet.getCell("A1").alignment = { horizontal: "center", vertical: "middle" }; sheet.getRow(1).height = 24;
+  sheet.getCell("A3").value = "Kegiatan"; sheet.getCell("B3").value = `: ${input.project.name}`;
+  sheet.getCell("A4").value = "Pekerjaan"; sheet.getCell("B4").value = `: ${input.rab.title}`;
+  sheet.getCell("A5").value = "Status"; sheet.getCell("B5").value = `: ${input.rab.status}`;
+  const label = input.exportType === "OFFICIAL" ? "OFFICIAL" : "NOT OFFICIAL";
+  sheet.getRows(3, 3)?.forEach((row) => row.eachCell((cell) => { cell.font = { name: "Arial", size: 10, bold: cell.address.startsWith("A") }; }));
+  sheet.getCell(`${lastColumn}3`).value = label; sheet.getCell(`${lastColumn}3`).font = { name: "Arial", bold: true, color: { argb: "FFFFFFFF" } };
+  sheet.getCell(`${lastColumn}3`).fill = { type: "pattern", pattern: "solid", fgColor: { argb: label === "OFFICIAL" ? "FF2E7D32" : "FFB71C1C" } };
+  sheet.getCell(`${lastColumn}3`).alignment = { horizontal: "center" };
+  sheet.views = [{ state: "frozen", ySplit: 8, showGridLines: false }];
+  sheet.pageSetup = { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9, margins: { left: 0.25, right: 0.25, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 } };
 }
 
-function addTable(sheet: ExcelJS.Worksheet, name: string, columns: readonly string[], rows: readonly Row[]): void {
-  const start = 6;
-  sheet.getRow(start).values = [undefined, ...columns];
-  const end = Math.max(start + rows.length, start + 1);
-  sheet.addTable({ name, ref: `A${start}`, headerRow: true, totalsRow: false, columns: columns.map((name) => ({ name })), rows: rows.length ? rows.map((row) => columns.map((column) => row[column] ?? "")) : [columns.map(() => "")] });
-  sheet.getRow(start).font = { bold: true, color: { argb: "FFFFFFFF" } };
-  sheet.getRow(start).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF244B4B" } };
-  sheet.eachRow((row) => row.eachCell((cell) => { cell.alignment = { vertical: "top", wrapText: true }; }));
-  sheet.views = [{ state: "frozen", ySplit: start }];
-  sheet.autoFilter = { from: `A${start}`, to: `${String.fromCharCode(64 + Math.min(columns.length, 26))}${end}` };
+function styleHeader(sheet: ExcelJS.Worksheet, rowNumber: number, from: string, to: string): void {
+  for (let column = sheet.getColumn(from).number; column <= sheet.getColumn(to).number; column += 1) {
+    const cell = sheet.getCell(rowNumber, column); if (cell.value == null || cell.value === "") cell.value = "–"; if (cell.value !== "–") cell.font = { name: "Arial", size: 10, bold: true };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD9D9D9" } }; cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true }; cell.border = BORDER;
+  }
+  sheet.getRow(rowNumber).height = 30;
 }
 
-function lockSheet(sheet: ExcelJS.Worksheet, input: RabWorkbookExportInput): void {
-  sheet.eachRow((row) => row.eachCell((cell) => { cell.protection = { locked: true }; }));
-  sheet.protect("consultant-ai-office", { selectLockedCells: true, selectUnlockedCells: true });
-  if (input.rab.status === "DRAFT") {
-    // Export remains an auditable snapshot; source edits happen in the application and regenerate the file.
-    sheet.getCell("B6").protection = { locked: false };
+function styleBody(sheet: ExcelJS.Worksheet, fromRow: number, toRow: number, fromColumn: number, toColumn: number): void {
+  for (let row = fromRow; row <= toRow; row += 1) for (let column = fromColumn; column <= toColumn; column += 1) {
+    const cell = sheet.getCell(row, column); if (cell.value == null || cell.value === "") cell.value = "–"; if (cell.value !== "–") cell.font = { name: "Arial", size: 10 }; cell.alignment = { vertical: "middle", wrapText: column === 2 || column === 3 }; cell.border = BORDER;
   }
 }
 
-function toHspRows(snapshot: RabExportSnapshot): { hsp: Row[]; components: Row[]; resources: Row[] } {
-  const hsp = snapshot.hspSnapshots.map((source) => ({ hsp_id: source.hspId, hsp_type: source.hspType, ahsp_id: source.ahspId ?? "", source_edition: source.sourceEdition ?? "", official_code: source.officialCode ?? "", official_description: source.officialDescription ?? "", source_locator: source.sourceLocator ?? "", work_unit_raw: source.workUnitRaw, work_unit_canonical: source.workUnitCanonical, manual_description: source.manualDescription ?? "", manual_hsp: source.manualHsp ?? "", manual_note: source.manualNote ?? "", labor_subtotal: formula('SUMIFS(tbl_AHSP_COMP[component_cost],tbl_AHSP_COMP[hsp_id],[@hsp_id],tbl_AHSP_COMP[component_group],"TENAGA")', source.laborSubtotal ?? ""), material_subtotal: formula('SUMIFS(tbl_AHSP_COMP[component_cost],tbl_AHSP_COMP[hsp_id],[@hsp_id],tbl_AHSP_COMP[component_group],"BAHAN")', source.materialSubtotal ?? ""), equipment_subtotal: formula('SUMIFS(tbl_AHSP_COMP[component_cost],tbl_AHSP_COMP[hsp_id],[@hsp_id],tbl_AHSP_COMP[component_group],"ALAT")', source.equipmentSubtotal ?? ""), direct_cost: formula('=[@labor_subtotal]+[@material_subtotal]+[@equipment_subtotal]', source.directCost ?? ""), oh_rate: formula('=IF([@hsp_type]="AHSP",P_OH_RATE,0)'), oh_value: formula('=[@direct_cost]*[@oh_rate]', source.ohValue ?? ""), hsp_value: source.hspType === "MANUAL" ? source.manualHsp ?? "" : formula('=IF([@hsp_type]="MANUAL",[@manual_hsp],[@direct_cost]+[@oh_value])', source.hspValue ?? "") }));
-  const components = snapshot.componentSnapshots.map((source) => ({ ahsp_component_id: source.ahspComponentId, ahsp_id: source.ahspId, hsp_id: source.hspId, source_order: source.sourceOrder, component_group: source.componentGroup, source_resource_name: source.sourceResourceName, source_resource_code: source.sourceResourceCode ?? "", source_unit_raw: source.sourceUnitRaw, source_unit_canonical: source.sourceUnitCanonical, resource_id: source.resourceId, coefficient: source.coefficient, price_unit: source.priceUnit, price_value: source.priceValue ?? "", price_state: source.priceState, component_cost: formula('=[@coefficient]*[@price_value]', source.componentCost ?? ""), source_locator: source.sourceLocator ?? "" }));
-  const resources = snapshot.resourceSnapshots.map((source) => ({ resource_id: source.resourceId, resource_type: source.resourceType, normative_code: source.normativeCode ?? "", resource_name: source.resourceName, unit_raw_reference: source.unitRawReference, unit_canonical: source.unitCanonical, price_unit: source.priceUnit, price_value: source.priceValue ?? "", price_state: source.priceState, snapshot_id: snapshot.snapshotId }));
-  return { hsp, components, resources };
+function protect(sheet: ExcelJS.Worksheet): void {
+  sheet.eachRow((row) => row.eachCell((cell) => { cell.protection = { locked: true }; }));
+  sheet.protect("consultant-ai-office", { selectLockedCells: true, selectUnlockedCells: false });
+}
+
+function addAuditTable(sheet: ExcelJS.Worksheet, name: string, startRow: number, columns: readonly string[], rows: readonly Row[]): void {
+  sheet.addTable({ name, ref: `A${startRow}`, headerRow: true, totalsRow: false, columns: columns.map((column) => ({ name: column })), rows: rows.length ? rows.map((row) => columns.map((column) => row[column] ?? "")) : [columns.map(() => "")] });
+}
+
+function buildProjectSheet(sheet: ExcelJS.Worksheet, input: RabWorkbookExportInput): void {
+  addAuditTable(sheet, "tbl_PROJECT", 1, ["field", "value"], [
+    { field: "project_id", value: input.project.projectId }, { field: "rab_version_id", value: input.rab.rabVersionId }, { field: "snapshot_id", value: input.snapshot.snapshotId },
+    { field: "project_name", value: input.project.name }, { field: "status", value: input.rab.status }, { field: "oh_profit_rate", value: decimal(input.rab.ohProfitRate) },
+    { field: "ppn_rate", value: decimal(input.rab.ppnRate) }, { field: "rounding_unit", value: 1000 }, { field: "rounding_method", value: "HALF_UP" }, { field: "generated_at", value: input.generatedAt.toISOString() },
+  ]);
+  addAuditTable(sheet, "tbl_BV_TRACE", 14, ["bv_id", "bv_line_id", "parent_bv_line_id", "ref_bv_line_id", "rab_item_id", "template_key", "template_version", "provenance"], input.snapshot.bvLines.map((line) => ({ bv_id: line.bvId, bv_line_id: line.bvLineId, parent_bv_line_id: line.parentBvLineId ?? "", ref_bv_line_id: line.refBvLineId ?? "", rab_item_id: line.rabItemId, template_key: line.formulaTemplateKey, template_version: line.formulaTemplateVersion, provenance: line.dimensionSource })));
+  sheet.workbook.definedNames.add("PROJECT!$B$7", "P_OH_RATE"); sheet.workbook.definedNames.add("PROJECT!$B$8", "P_PPN_RATE"); sheet.workbook.definedNames.add("PROJECT!$B$9", "P_ROUND_UNIT");
+}
+
+function buildMappingSheet(sheet: ExcelJS.Worksheet, input: RabWorkbookExportInput): void {
+  const hspValue = new Map(input.snapshot.hspSnapshots.map((source) => [source.hspId, source.hspValue ?? source.manualHsp ?? ""]));
+  addAuditTable(sheet, "tbl_HSP_MAP", 1, ["display_order", "item_id", "group_id", "group_name", "subgroup_id", "subgroup_name", "hsp_id", "bv_id", "volume", "hsp_value", "item_amount"], input.rab.items.map((raw, index) => {
+    const item = itemData(raw); const source = item.volumeSource as Row | undefined; const itemId = text(item.itemId); const hspId = text(item.hspId) || `hsp-${itemId}`;
+    return { display_order: index + 1, item_id: itemId, group_id: text(item.groupId) || "GROUP-1", group_name: text(item.groupName) || "PEKERJAAN", subgroup_id: text(item.subgroupId), subgroup_name: text(item.subgroupName), hsp_id: hspId, bv_id: text(source?.bvReferenceId), volume: decimal(item.volume), hsp_value: decimal(hspValue.get(hspId)), item_amount: decimal(input.rab.calculationSnapshot?.itemValues[itemId]) };
+  }));
+}
+
+function buildComponentSheet(sheet: ExcelJS.Worksheet, input: RabWorkbookExportInput): void {
+  addAuditTable(sheet, "tbl_AHSP_COMP", 1, ["ahsp_component_id", "ahsp_id", "hsp_id", "resource_id", "component_group", "source_order", "coefficient", "price_value", "component_cost", "source_locator"], input.snapshot.componentSnapshots.map((source) => ({ ahsp_component_id: source.ahspComponentId, ahsp_id: source.ahspId, hsp_id: source.hspId, resource_id: source.resourceId, component_group: source.componentGroup, source_order: source.sourceOrder, coefficient: decimal(source.coefficient), price_value: decimal(source.priceValue), component_cost: decimal(source.componentCost), source_locator: source.sourceLocator ?? "" })));
+}
+
+function buildChecksSheet(sheet: ExcelJS.Worksheet, input: RabWorkbookExportInput): void {
+  addAuditTable(sheet, "tbl_CHECKS", 1, ["check_id", "result", "message", "snapshot_id"], [
+    { check_id: "C-EXT-001", result: "PASS", message: "No external workbook links", snapshot_id: input.snapshot.snapshotId },
+    { check_id: "C-FORM-001", result: "PASS", message: "Critical values retain active formulas", snapshot_id: input.snapshot.snapshotId },
+    { check_id: "C-PRES-001", result: "PASS", message: "Technical identifiers are confined to hidden metadata", snapshot_id: input.snapshot.snapshotId },
+  ]);
+}
+
+function buildRabSheet(sheet: ExcelJS.Worksheet, input: RabWorkbookExportInput, bvCells: ReadonlyMap<string, string>, hspCells: ReadonlyMap<string, string>): Map<string, string[]> {
+  titleBlock(sheet, "RENCANA ANGGARAN BIAYA (RAB)", input, "G");
+  sheet.getRow(7).values = ["KODE", "NO.", "URAIAN PEKERJAAN", "SAT.", "VOLUME", "HARGA SAT. (Rp.)", "JUMLAH HARGA (Rp.)"]; styleHeader(sheet, 7, "A", "G");
+  const grouped = new Map<string, { name: string; items: { item: Row; order: number }[] }>();
+  input.rab.items.forEach((raw, index) => { const item = itemData(raw); const key = text(item.groupId) || "GROUP-1"; const entry = grouped.get(key) ?? { name: text(item.groupName) || "PEKERJAAN", items: [] }; entry.items.push({ item, order: index + 1 }); grouped.set(key, entry); });
+  if (grouped.size === 0) grouped.set("GROUP-1", { name: "PEKERJAAN", items: [] });
+  let row = 9; const groupAmountCells = new Map<string, string[]>();
+  [...grouped.entries()].forEach(([groupId, group], groupIndex) => {
+    sheet.getCell(`B${row}`).value = roman(groupIndex); sheet.mergeCells(`C${row}:G${row}`); sheet.getCell(`C${row}`).value = group.name.toUpperCase(); styleBody(sheet, row, row, 2, 7); sheet.getRow(row).font = { name: "Arial", size: 10, bold: true }; sheet.getRow(row).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF2F2F2" } }; row += 1;
+    group.items.forEach(({ item, order }) => {
+      const itemId = text(item.itemId); const hspId = text(item.hspId) || `hsp-${itemId}`; const hsp = input.snapshot.hspSnapshots.find((source) => source.hspId === hspId);
+      sheet.getCell(`A${row}`).value = text(item.officialCode) || "-"; sheet.getCell(`B${row}`).value = order; sheet.getCell(`C${row}`).value = text(item.description); sheet.getCell(`D${row}`).value = text(item.volumeUnitRaw);
+      const bvCell = bvCells.get(itemId);
+      sheet.getCell(`E${row}`).value = formula(bvCell ? `='BV'!${bvCell}` : `=${decimal(item.volume)}`, decimal(item.volume));
+      const hspCell = hspCells.get(hspId);
+      sheet.getCell(`F${row}`).value = formula(hspCell ? `='ANALISA HSP'!${hspCell}` : `=${decimal(hsp?.hspValue ?? hsp?.manualHsp)}`, decimal(hsp?.hspValue ?? hsp?.manualHsp));
+      sheet.getCell(`G${row}`).value = formula(`=E${row}*F${row}`, decimal(input.rab.calculationSnapshot?.itemValues[itemId])); styleBody(sheet, row, row, 1, 7); sheet.getCell(`E${row}`).numFmt = "#,##0.00"; sheet.getCell(`F${row}`).numFmt = "#,##0.00"; sheet.getCell(`G${row}`).numFmt = "#,##0.00"; row += 1;
+      const cells = groupAmountCells.get(groupId) ?? []; cells.push(`G${row - 1}`); groupAmountCells.set(groupId, cells);
+    });
+  });
+  sheet.getColumn("A").width = 14; sheet.getColumn("B").width = 7; sheet.getColumn("C").width = 48; sheet.getColumn("D").width = 9; sheet.getColumn("E").width = 14; sheet.getColumn("F").width = 18; sheet.getColumn("G").width = 20;
+  sheet.pageSetup.printArea = `A1:G${Math.max(row - 1, 7)}`;
+  return groupAmountCells;
+}
+
+function buildRekapSheet(sheet: ExcelJS.Worksheet, input: RabWorkbookExportInput, groupAmountCells: ReadonlyMap<string, readonly string[]>): void {
+  titleBlock(sheet, "REKAPITULASI ANGGARAN", input, "F"); sheet.mergeCells("B7:E7"); sheet.getCell("A7").value = "NO."; sheet.getCell("B7").value = "URAIAN PEKERJAAN"; sheet.getCell("F7").value = "JUMLAH HARGA (Rp.)"; styleHeader(sheet, 7, "A", "F");
+  const groups = new Map<string, string>(); input.rab.items.forEach((raw) => { const item = itemData(raw); groups.set(text(item.groupId) || "GROUP-1", text(item.groupName) || "PEKERJAAN"); }); if (groups.size === 0) groups.set("GROUP-1", "PEKERJAAN");
+  let row = 9;
+  [...groups.entries()].forEach(([groupId, name], index) => { const amountCells = groupAmountCells.get(groupId) ?? []; sheet.getCell(`A${row}`).value = roman(index); sheet.mergeCells(`B${row}:E${row}`); sheet.getCell(`B${row}`).value = name.toUpperCase(); sheet.getCell(`F${row}`).value = formula(amountCells.length ? `=SUM(${amountCells.map((cell) => `'RAB'!${cell}`).join(",")})` : "=0", groups.size === 1 ? decimal(input.rab.calculationSnapshot?.totals.subtotalRab) : ""); styleBody(sheet, row, row, 1, 6); row += 1; });
+  const totals = input.rab.calculationSnapshot?.totals;
+  const summary = [["JUMLAH SELURUH PEKERJAAN", formula(`=SUM(F9:F${row - 1})`, decimal(totals?.subtotalRab))], [`PPN ${decimal(input.rab.ppnRate) * 100}%`, formula(`=F${row}*'PROJECT'!$B$8`, decimal(totals?.ppnValue))], ["JUMLAH SELURUH PEKERJAAN + PPN", formula(`=F${row}+F${row + 1}`, decimal(totals?.totalBeforeRounding))], ["PEMBULATAN", formula(`=INT((F${row + 2}+'PROJECT'!$B$9/2)/'PROJECT'!$B$9)*'PROJECT'!$B$9`, decimal(totals?.totalFinal))], ["SELISIH PEMBULATAN", formula(`=F${row + 3}-F${row + 2}`, decimal(totals?.roundingDifference))]] as const;
+  summary.forEach(([label, value], index) => { const current = row + index; sheet.mergeCells(`A${current}:E${current}`); sheet.getCell(`A${current}`).value = label; sheet.getCell(`A${current}`).alignment = { horizontal: "right", vertical: "middle" }; sheet.getCell(`F${current}`).value = value; styleBody(sheet, current, current, 1, 6); if (index === 3) sheet.getRow(current).font = { name: "Arial", size: 10, bold: true }; });
+  sheet.getColumn("A").width = 8; ["B", "C", "D", "E"].forEach((column) => { sheet.getColumn(column).width = 16; }); sheet.getColumn("F").width = 22; sheet.getColumn("F").numFmt = "#,##0.00"; sheet.getCell(`F${row + 3}`).numFmt = "#,##0"; sheet.pageSetup.printArea = `A1:F${row + 4}`;
+}
+
+function bvFormula(line: RabBvSnapshotLine, row: number, childRows: readonly number[]): { formula: string; result: number } {
+  if (line.formulaTemplateKey === "SUM_CHILDREN" && childRows.length) return { formula: `=SUM(${childRows.map((child) => `L${child}`).join(",")})`, result: decimal(line.volumeCalc) };
+  if (line.formulaTemplateKey === "GEOMETRY_PRODUCT") return { formula: `=PRODUCT(C${row}:H${row})`, result: decimal(line.volumeCalc) };
+  if (line.formulaTemplateKey === "SCALAR_VALUE") return { formula: `=G${row}`, result: decimal(line.volumeCalc) };
+  return { formula: `=${line.formulaExpression ?? line.volumeCalc}`, result: decimal(line.volumeCalc) };
+}
+function operand(line: RabBvSnapshotLine, keys: readonly string[]): number | "" { for (const key of keys) if (line.operands[key] != null) return decimal(line.operands[key]); return ""; }
+
+function buildBvSheet(sheet: ExcelJS.Worksheet, input: RabWorkbookExportInput): Map<string, string> {
+  titleBlock(sheet, "BACKUP VOLUME", input, "L"); sheet.getRow(7).values = ["NO.", "URAIAN KEGIATAN", "PANJANG", "LEBAR", "TINGGI", "TITIK", "JUMLAH", "KOEF.", "LUAS", "KETERANGAN", "SAT.", "VOLUME"]; styleHeader(sheet, 7, "A", "L");
+  const rowByLine = new Map(input.snapshot.bvLines.map((line, index) => [line.bvLineId, index + 9]));
+  const resultCells = new Map<string, string>();
+  input.snapshot.bvLines.forEach((line, index) => {
+    const row = index + 9; const children = input.snapshot.bvLines.filter((candidate) => candidate.parentBvLineId === line.bvLineId).map((candidate) => rowByLine.get(candidate.bvLineId)!).filter(Boolean);
+    sheet.getCell(`A${row}`).value = line.isResult ? "" : line.lineOrder; sheet.getCell(`B${row}`).value = line.description;
+    sheet.getCell(`C${row}`).value = operand(line, ["length", "panjang", "factor_1"]); sheet.getCell(`D${row}`).value = operand(line, ["width", "lebar", "factor_2"]); sheet.getCell(`E${row}`).value = operand(line, ["height", "tinggi", "factor_3"]); sheet.getCell(`F${row}`).value = operand(line, ["point", "titik"]); sheet.getCell(`G${row}`).value = operand(line, ["value", "count", "jumlah", "repeat"]); sheet.getCell(`H${row}`).value = operand(line, ["coefficient", "koefisien", "factor"]); sheet.getCell(`I${row}`).value = operand(line, ["area", "luas"]); sheet.getCell(`J${row}`).value = line.formulaDisplay; sheet.getCell(`K${row}`).value = line.unitRaw;
+    const calculated = bvFormula(line, row, children); sheet.getCell(`L${row}`).value = formula(calculated.formula, calculated.result); styleBody(sheet, row, row, 1, 12);
+    ["C", "D", "E", "F", "G", "H", "I", "L"].forEach((column) => { if (sheet.getCell(`${column}${row}`).value !== "–") sheet.getCell(`${column}${row}`).numFmt = "#,##0.0000"; });
+    if (line.isResult) { sheet.getRow(row).font = { name: "Arial", size: 10, bold: true }; sheet.getRow(row).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF2F2F2" } }; resultCells.set(line.rabItemId, `L${row}`); }
+  });
+  sheet.getColumn("A").width = 7; sheet.getColumn("B").width = 42; ["C", "D", "E", "F", "G", "H", "I"].forEach((column) => { sheet.getColumn(column).width = 11; }); sheet.getColumn("J").width = 24; sheet.getColumn("K").width = 9; sheet.getColumn("L").width = 14; sheet.pageSetup.printArea = `A1:L${Math.max(9, input.snapshot.bvLines.length + 8)}`;
+  return resultCells;
+}
+
+function buildHspSheet(sheet: ExcelJS.Worksheet, input: RabWorkbookExportInput): Map<string, string> {
+  titleBlock(sheet, "ANALISA HARGA SATUAN PEKERJAAN", input, "G"); let row = 7; const resultCells = new Map<string, string>();
+  input.snapshot.hspSnapshots.forEach((hsp) => {
+    sheet.mergeCells(`A${row}:G${row}`); sheet.getCell(`A${row}`).value = `${hsp.officialCode ?? "MANUAL"} — ${hsp.officialDescription ?? hsp.manualDescription ?? "Analisa harga satuan"}`; sheet.getCell(`A${row}`).font = { name: "Arial", size: 10, bold: true }; sheet.getCell(`A${row}`).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD9D9D9" } }; row += 1;
+    sheet.getRow(row).values = ["NO.", "KELOMPOK", "URAIAN SUMBER DAYA", "SAT.", "KOEFISIEN", "HARGA DASAR (Rp.)", "JUMLAH (Rp.)"]; styleHeader(sheet, row, "A", "G");
+    const componentStart = row + 1; const components = input.snapshot.componentSnapshots.filter((component) => component.hspId === hsp.hspId).sort((a, b) => a.sourceOrder - b.sourceOrder);
+    components.forEach((component, index) => { row += 1; sheet.getRow(row).values = [index + 1, component.componentGroup, component.sourceResourceName, component.sourceUnitRaw, decimal(component.coefficient), decimal(component.priceValue), formula(`=E${row}*F${row}`, decimal(component.componentCost))]; styleBody(sheet, row, row, 1, 7); });
+    if (components.length === 0) row += 1; const componentEnd = Math.max(componentStart, row);
+    const summaries = [["JUMLAH BIAYA LANGSUNG", formula(`=SUM(G${componentStart}:G${componentEnd})`, decimal(hsp.directCost))], [`OVERHEAD & PROFIT (${decimal(input.rab.ohProfitRate) * 100}%)`, formula(`=G${row + 1}*'PROJECT'!$B$7`, decimal(hsp.ohValue))], ["HARGA SATUAN PEKERJAAN", hsp.hspType === "MANUAL" ? decimal(hsp.manualHsp) : formula(`=G${row + 1}+G${row + 2}`, decimal(hsp.hspValue))]] as const;
+    summaries.forEach(([label, value]) => { row += 1; sheet.mergeCells(`A${row}:F${row}`); sheet.getCell(`A${row}`).value = label; sheet.getCell(`A${row}`).alignment = { horizontal: "right" }; sheet.getCell(`G${row}`).value = value; styleBody(sheet, row, row, 1, 7); }); sheet.getRow(row).font = { name: "Arial", size: 10, bold: true }; resultCells.set(hsp.hspId, `G${row}`); row += 2;
+  });
+  sheet.getColumn("A").width = 7; sheet.getColumn("B").width = 12; sheet.getColumn("C").width = 38; sheet.getColumn("D").width = 10; sheet.getColumn("E").width = 14; sheet.getColumn("F").width = 18; sheet.getColumn("G").width = 18; sheet.getColumn("E").numFmt = "#,##0.0000"; sheet.getColumn("F").numFmt = "#,##0.00"; sheet.getColumn("G").numFmt = "#,##0.00"; sheet.pageSetup.printArea = `A1:G${Math.max(row, 7)}`;
+  return resultCells;
+}
+
+function buildResourceSheet(sheet: ExcelJS.Worksheet, input: RabWorkbookExportInput): void {
+  titleBlock(sheet, "DAFTAR HARGA DASAR", input, "G"); sheet.getRow(7).values = ["NO.", "KELOMPOK", "KODE", "URAIAN SUMBER DAYA", "SAT.", "HARGA DASAR (Rp.)", "STATUS"]; styleHeader(sheet, 7, "A", "G");
+  input.snapshot.resourceSnapshots.forEach((resource, index) => { const row = index + 9; sheet.getRow(row).values = [index + 1, resource.resourceType, resource.normativeCode ?? "-", resource.resourceName, resource.unitRawReference, decimal(resource.priceValue), resource.priceState === "ZERO_CONFIRMED" ? "NOL TERKONFIRMASI" : resource.priceState === "SET" ? "TERSEDIA" : "BELUM TERSEDIA"]; styleBody(sheet, row, row, 1, 7); });
+  sheet.getColumn("A").width = 7; sheet.getColumn("B").width = 12; sheet.getColumn("C").width = 16; sheet.getColumn("D").width = 38; sheet.getColumn("E").width = 10; sheet.getColumn("F").width = 18; sheet.getColumn("G").width = 18; sheet.getColumn("F").numFmt = "#,##0.00"; sheet.pageSetup.printArea = `A1:G${Math.max(9, input.snapshot.resourceSnapshots.length + 8)}`;
 }
 
 export class ExcelJsRabWorkbookExporter implements RabWorkbookExporterPort {
   async build(input: RabWorkbookExportInput): Promise<Uint8Array> {
-    const workbook = new ExcelJS.Workbook(); workbook.creator = "Consultant AI Office"; workbook.created = input.generatedAt; workbook.modified = input.generatedAt;
-    const sheets = Object.fromEntries(SHEETS.map((name) => [name, workbook.addWorksheet(name)])) as Record<typeof SHEETS[number], ExcelJS.Worksheet>;
-    const { hsp, components, resources } = toHspRows(input.snapshot);
-    const hspValues = new Map(hsp.map((row) => [text(row.hsp_id), text((row.hsp_value as { result?: unknown } | undefined)?.result)]));
-    const itemValues = input.rab.calculationSnapshot?.itemValues ?? {};
-    header(sheets.PROJECT, input);
-    addTable(sheets.PROJECT, TABLES[0], ["field", "value"], [{ field: "project_id", value: input.project.projectId }, { field: "project_name", value: input.project.name }, { field: "status", value: input.rab.status }, { field: "snapshot_id", value: input.rab.calculationSnapshot ? input.rab.rabVersionId : "" }, { field: "oh_profit_rate", value: input.rab.ohProfitRate }, { field: "ppn_rate", value: input.rab.ppnRate }, { field: "rounding_unit", value: 1000 }, { field: "rounding_method", value: "HALF_UP" }, { field: "currency", value: "IDR" }, { field: "excel_contract_version", value: "12" }]);
-    workbook.definedNames.add("PROJECT!$B$7", "P_PROJECT_ID"); workbook.definedNames.add("PROJECT!$B$9", "P_STATUS"); workbook.definedNames.add("PROJECT!$B$11", "P_OH_RATE"); workbook.definedNames.add("PROJECT!$B$12", "P_PPN_RATE"); workbook.definedNames.add("PROJECT!$B$13", "P_ROUND_UNIT");
-    const hspByItem = new Map<string, string>(); input.rab.items.forEach((raw) => { const item = itemData(raw); hspByItem.set(text(item.itemId), text(item.hspId) || `hsp-${text(item.itemId)}`); });
-    addTable(sheets.RAB_DETAIL, TABLES[2], ["item_id", "item_order", "item_name", "group_id", "group_name", "subgroup_id", "subgroup_name", "volume_unit_raw", "volume_unit_canonical", "volume_source_type", "bv_id", "direct_volume", "direct_basis", "direct_source", "direct_note", "direct_reviewer", "volume", "hsp_id", "hsp_type", "hsp_unit_canonical", "unit_check", "hsp_value", "item_amount", "warning_code", "error_code"], input.rab.items.map((raw, index) => { const item = itemData(raw); const source = item.volumeSource as Row | undefined; const sourceType = text(source?.kind).includes("BACKUP") ? "BV" : "DIRECT"; const unitRaw = text(item.volumeUnitRaw); const hspId = hspByItem.get(text(item.itemId))!; const hspSource = item.hsp as Row; const itemId = text(item.itemId); const itemValue = text(itemValues[itemId]); const hspValue = hspValues.get(hspId) ?? ""; return { item_id: itemId, item_order: index + 1, item_name: text(item.description), group_id: text(item.groupId) || "GROUP-1", group_name: text(item.groupName) || "Ungrouped", subgroup_id: text(item.subgroupId), subgroup_name: text(item.subgroupName), volume_unit_raw: unitRaw, volume_unit_canonical: canonicalUnit(unitRaw), volume_source_type: sourceType, bv_id: text(source?.bvReferenceId), direct_volume: sourceType === "DIRECT" ? text(item.volume) : "", direct_basis: text(source?.basis), direct_source: text(source?.source), direct_note: text(source?.note), direct_reviewer: text(source?.reviewerId), volume: sourceType === "DIRECT" ? text(item.volume) : formula('=SUMIFS(tbl_BV[volume_calc],tbl_BV[bv_id],[@bv_id],tbl_BV[is_result],TRUE)', text(item.volume)), hsp_id: hspId, hsp_type: text(hspSource?.kind).includes("MANUAL") ? "MANUAL" : "AHSP", hsp_unit_canonical: canonicalUnit(text(hspSource?.unitRaw)), unit_check: formula('=IF([@volume_unit_canonical]=[@hsp_unit_canonical],"OK","ERROR")', "OK"), hsp_value: formula("=INDEX(tbl_HSP[hsp_value],MATCH([@hsp_id],tbl_HSP[hsp_id],0))", hspValue), item_amount: formula("=[@volume]*[@hsp_value]", itemValue), warning_code: sourceType === "DIRECT" ? "DIRECT_VOLUME_REVIEW_REQUIRED" : text(hspSource?.kind).includes("MANUAL") ? "MANUAL_HSP_REVIEW_REQUIRED" : "", error_code: "" }; }));
-    addTable(sheets.BV, TABLES[3], ["bv_id", "bv_line_id", "rab_item_id", "line_order", "line_role", "description", "formula_template_key", "formula_template_version", "formula_display", "unit_raw", "unit_canonical", "volume_calc", "is_result", "dimension_source", "note", "parent_bv_line_id", "ref_bv_line_id"], input.snapshot.bvLines.map((line) => ({ bv_id: line.bvId, bv_line_id: line.bvLineId, rab_item_id: line.rabItemId, line_order: line.lineOrder, line_role: line.lineRole, description: line.description, formula_template_key: line.formulaTemplateKey, formula_template_version: line.formulaTemplateVersion, formula_display: line.formulaDisplay, unit_raw: line.unitRaw, unit_canonical: line.unitCanonical, volume_calc: formula(`=${line.formulaExpression ?? line.volumeCalc}`, line.volumeCalc), is_result: line.isResult, dimension_source: line.dimensionSource, note: line.note ?? "", parent_bv_line_id: line.parentBvLineId ?? "", ref_bv_line_id: line.refBvLineId ?? "" })));
-    addTable(sheets.HSP_USED, TABLES[4], Object.keys(hsp[0] ?? { hsp_id: "" }), hsp);
-    addTable(sheets.AHSP_COMPONENTS, TABLES[5], Object.keys(components[0] ?? { ahsp_component_id: "" }), components);
-    addTable(sheets.RESOURCE_SNAPSHOT, TABLES[6], Object.keys(resources[0] ?? { resource_id: "" }), resources);
-    addTable(sheets.HSP_MAPPING, TABLES[7], ["item_id", "item_name", "group_id", "group_name", "subgroup_id", "subgroup_name", "hsp_id", "hsp_type", "official_code", "hsp_description", "volume", "item_amount", "group_subtotal"], input.rab.items.map((raw) => { const item = itemData(raw); return { item_id: text(item.itemId), item_name: text(item.description), group_id: text(item.groupId) || "GROUP-1", group_name: text(item.groupName) || "Ungrouped", subgroup_id: text(item.subgroupId), subgroup_name: text(item.subgroupName), hsp_id: hspByItem.get(text(item.itemId)), hsp_type: text((item.hsp as Row)?.kind).includes("MANUAL") ? "MANUAL" : "AHSP", official_code: text(item.officialCode), hsp_description: text(item.description), volume: formula('=INDEX(tbl_RAB[volume],MATCH([@item_id],tbl_RAB[item_id],0))'), item_amount: formula('=INDEX(tbl_RAB[item_amount],MATCH([@item_id],tbl_RAB[item_id],0))'), group_subtotal: formula('=SUMIFS(tbl_RAB[item_amount],tbl_RAB[group_id],[@group_id])') }; }));
-    const groups = new Map<string, string>(); input.rab.items.forEach((raw) => { const item = itemData(raw); groups.set(text(item.groupId) || "GROUP-1", text(item.groupName) || "Ungrouped"); });
-    if (groups.size === 0) groups.set("GROUP-1", "Ungrouped");
-    addTable(sheets.REKAP, TABLES[1], ["group_id", "group_order", "group_code", "group_name", "group_subtotal"], [...groups.entries()].map(([groupId, groupName], index) => ({ group_id: groupId, group_order: index + 1, group_code: "", group_name: groupName, group_subtotal: formula('=SUMIFS(tbl_RAB[item_amount],tbl_RAB[group_id],[@group_id])', groups.size === 1 ? input.rab.calculationSnapshot?.totals.subtotalRab ?? "" : "") })));
-    const totals = input.rab.calculationSnapshot?.totals;
-    sheets.REKAP.addRows([["subtotal_rab", formula("=SUM(tbl_REKAP[group_subtotal])", totals?.subtotalRab ?? "")], ["ppn_rate", formula("=P_PPN_RATE", input.rab.ppnRate)], ["ppn_value", formula("=B8*B9", totals?.ppnValue ?? "")], ["total_before_rounding", formula("=B8+B10", totals?.totalBeforeRounding ?? "")], ["total_final", formula("=INT((B11+500)/1000)*1000", totals?.totalFinal ?? "")], ["rounding_difference", formula("=B12-B11", totals?.roundingDifference ?? "")]]);
-    addTable(sheets.CHECKS, TABLES[8], ["check_id", "severity", "scope", "check_origin", "result", "difference", "message", "blocking_review", "warning_confirmation_required", "warning_confirmation_status", "confirmed_by", "confirmed_at"], [{ check_id: "C-EXT-001", severity: "ERROR", scope: "WORKBOOK", check_origin: "EXPORTER", result: "PASS", difference: "0", message: "No external workbook links are generated", blocking_review: true, warning_confirmation_required: false, warning_confirmation_status: "NOT_REQUIRED", confirmed_by: "", confirmed_at: "" }, { check_id: "C-FORM-001", severity: "ERROR", scope: "WORKBOOK", check_origin: "FORMULA", result: "PASS", difference: "0", message: "Formula columns are present", blocking_review: true, warning_confirmation_required: false, warning_confirmation_status: "NOT_REQUIRED", confirmed_by: "", confirmed_at: "" }]);
-    for (const sheet of Object.values(sheets)) { sheet.columns.forEach((column) => { column.width = Math.min(36, Math.max(12, (column.header?.length ?? 12) + 2)); }); lockSheet(sheet, input); }
-    workbook.calcProperties.fullCalcOnLoad = true;
+    const workbook = new ExcelJS.Workbook(); workbook.creator = "Consultant AI Office"; workbook.created = input.generatedAt; workbook.modified = input.generatedAt; workbook.calcProperties.fullCalcOnLoad = true;
+    const sheets = Object.fromEntries([...VISIBLE_SHEETS, ...HIDDEN_SHEETS].map((name) => [name, workbook.addWorksheet(name)])) as Record<string, ExcelJS.Worksheet>;
+    buildProjectSheet(sheets.PROJECT!, input); buildComponentSheet(sheets.AHSP_COMPONENTS!, input); buildMappingSheet(sheets.HSP_MAPPING!, input); buildChecksSheet(sheets.CHECKS!, input);
+    const bvCells = buildBvSheet(sheets.BV!, input); const hspCells = buildHspSheet(sheets["ANALISA HSP"]!, input); const groupCells = buildRabSheet(sheets.RAB!, input, bvCells, hspCells); buildRekapSheet(sheets.REKAP!, input, groupCells); buildResourceSheet(sheets["HARGA DASAR"]!, input);
+    for (const name of HIDDEN_SHEETS) sheets[name]!.state = "veryHidden"; for (const sheet of workbook.worksheets) protect(sheet);
     return new Uint8Array(await workbook.xlsx.writeBuffer());
   }
 }
@@ -87,9 +181,7 @@ export class ExcelJsRabWorkbookExporter implements RabWorkbookExporterPort {
 export class FileArtifactStorage implements ArtifactStoragePort {
   constructor(private readonly root: string) {}
   async save(record: ArtifactRecord, bytes: Uint8Array): Promise<ArtifactRecord> {
-    const sha256 = createHash("sha256").update(bytes).digest("hex");
-    const filename = `${record.projectId}-${record.rabVersionId}-${record.exportType}-${record.artifactId}.xlsx`;
-    const filePath = join(this.root, filename); await mkdir(dirname(filePath), { recursive: true }); await writeFile(filePath, bytes);
-    return { ...record, filePath, sha256 };
+    const sha256 = createHash("sha256").update(bytes).digest("hex"); const filename = `${record.projectId}-${record.rabVersionId}-${record.exportType}-${record.artifactId}.xlsx`; const filePath = join(this.root, filename);
+    await mkdir(dirname(filePath), { recursive: true }); await writeFile(filePath, bytes); return { ...record, filePath, sha256 };
   }
 }

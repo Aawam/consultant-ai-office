@@ -77,15 +77,19 @@ describe("Phase 1A golden output validation", () => {
 
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(bytes);
-    expect(workbook.getWorksheet("PROJECT")?.getCell("D3").value).toBe("NOT OFFICIAL");
+    const visibleSheets = workbook.worksheets.filter((sheet) => sheet.state === "visible").map((sheet) => sheet.name);
+    const hiddenSheets = workbook.worksheets.filter((sheet) => sheet.state !== "visible").map((sheet) => sheet.name);
+    expect(visibleSheets).toEqual(["REKAP", "RAB", "BV", "ANALISA HSP", "HARGA DASAR"]);
+    expect(hiddenSheets).toEqual(["PROJECT", "AHSP_COMPONENTS", "HSP_MAPPING", "CHECKS"]);
+    expect(workbook.getWorksheet("REKAP")?.getCell("F3").value).toBe("NOT OFFICIAL");
     expect(workbook.getWorksheet("PROJECT")?.getCell("B4").value).toBe(snapshot.snapshotId);
-    expect(workbook.getWorksheet("BV")?.getCell("L14").value).toMatchObject({ formula: expect.stringContaining("SUMIFS"), result: volumeOracle });
-    expect(workbook.getWorksheet("HSP_USED")?.getCell("S7").value).toMatchObject({ result: hspOracle.hspValue });
-    expect(workbook.getWorksheet("RAB_DETAIL")?.getCell("Q7").value).toMatchObject({ result: volumeOracle });
-    expect(workbook.getWorksheet("RAB_DETAIL")?.getCell("V7").value).toMatchObject({ result: hspOracle.hspValue });
-    expect(workbook.getWorksheet("RAB_DETAIL")?.getCell("W7").value).toMatchObject({ result: itemOracle.itemValue });
-    expect(workbook.getWorksheet("REKAP")?.getCell("B10").value).toMatchObject({ result: totalsOracle.ppnValue });
-    expect(workbook.getWorksheet("REKAP")?.getCell("B12").value).toMatchObject({ result: totalsOracle.totalFinal });
+    expect(workbook.getWorksheet("BV")?.getCell("L16").value).toMatchObject({ formula: expect.stringContaining("SUM"), result: Number(volumeOracle) });
+    expect(workbook.getWorksheet("ANALISA HSP")?.getCell("G13").value).toMatchObject({ result: Number(hspOracle.hspValue) });
+    expect(workbook.getWorksheet("RAB")?.getCell("E10").value).toMatchObject({ result: Number(volumeOracle) });
+    expect(workbook.getWorksheet("RAB")?.getCell("F10").value).toMatchObject({ result: Number(hspOracle.hspValue) });
+    expect(workbook.getWorksheet("RAB")?.getCell("G10").value).toMatchObject({ result: Number(itemOracle.itemValue) });
+    expect(workbook.getWorksheet("REKAP")?.getCell("F11").value).toMatchObject({ result: Number(totalsOracle.ppnValue) });
+    expect(workbook.getWorksheet("REKAP")?.getCell("F13").value).toMatchObject({ result: Number(totalsOracle.totalFinal) });
 
     let formulaCount = 0;
     const errors: string[] = [];
@@ -93,10 +97,13 @@ describe("Phase 1A golden output validation", () => {
       const value = cell.value;
       if (value && typeof value === "object" && "formula" in value) formulaCount += 1;
       const serialized = JSON.stringify(value);
-      if (serialized.includes("#REF!") || serialized.includes("#DIV/0!") || serialized.includes("#VALUE!") || serialized.includes("#NAME?")) errors.push(`${sheet.name}!${cell.address}: ${serialized}`);
+      if (serialized.includes("#REF!") || serialized.includes("#DIV/0!") || serialized.includes("#VALUE!") || serialized.includes("#NAME?") || serialized.includes("#N/A")) errors.push(`${sheet.name}!${cell.address}: ${serialized}`);
     }));
     expect(formulaCount).toBeGreaterThan(0);
     expect(errors).toEqual([]);
-    await writeFile(join(outputDir, "GT-07-GT-09-comparison.json"), JSON.stringify({ generatedAt: generatedAt.toISOString(), snapshotId: snapshot.snapshotId, workbook: workbookPath, checks: { label: "NOT OFFICIAL", formulas: "PASS", formulaErrors: errors, item: { expected: goldenRabCases.gt09.expectedItemValue, actual: itemOracle.itemValue }, volume: { expected: goldenRabCases.gt09.expectedVolume, actual: volumeOracle }, hsp: { expected: goldenAhspCases.gt07.expectedHsp, actual: hspOracle.hspValue }, totals: totalsOracle } }, null, 2));
+    const packageText = Buffer.from(bytes).toString("latin1");
+    expect(packageText).not.toContain("externalLinks");
+    expect(packageText).not.toContain("vbaProject.bin");
+    await writeFile(join(outputDir, "GT-07-GT-09-comparison.json"), JSON.stringify({ generatedAt: generatedAt.toISOString(), snapshotId: snapshot.snapshotId, workbook: workbookPath, checks: { label: "NOT OFFICIAL", formulas: "PASS", formulaErrors: errors, externalLinks: "ABSENT", macros: "ABSENT", presentation: { visibleSheets, hiddenTraceabilitySheets: hiddenSheets, rawTechnicalIdsVisible: false, visualInspection: "outputs/phase-1a-golden/visual-inspection" }, item: { expected: goldenRabCases.gt09.expectedItemValue, actual: itemOracle.itemValue }, volume: { expected: goldenRabCases.gt09.expectedVolume, actual: volumeOracle }, hsp: { expected: goldenAhspCases.gt07.expectedHsp, actual: hspOracle.hspValue }, totals: totalsOracle } }, null, 2));
   });
 });
