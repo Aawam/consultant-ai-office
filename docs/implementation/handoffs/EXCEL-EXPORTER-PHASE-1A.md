@@ -51,7 +51,15 @@ Automated comparison:
 
 **PENDING — CIVIL TECHNICAL VALIDATOR SIGN-OFF REQUIRED**
 
-Validator must review the workbook contents and record name, role, date, and decision for item identity, volume/BV traceability, AHSP/resource/base-price identity, HSP calculation, subtotal, OH/profit, PPN, rounding, and grand total. No external validator identity or sign-off has been supplied in this repository, so none is asserted here.
+Validator must review the workbook contents and record name, role, date, and decision for item identity, volume/BV traceability, AHSP/resource/base-price identity, HSP calculation, subtotal, OH/profit, PPN, rounding, and grand total. No civil technical validator identity or sign-off has been supplied in this repository, so none is asserted here.
+
+### Development review log
+
+| Recorded at (local) | Reviewer | Role | Classification | Note |
+|---|---|---|---|---|
+| 2026-08-31 20:47:02 WITA (+0800) | Atmin Awam | Atmin | DEVELOPMENT REVIEW LOG | Workbook presentation demo reviewed and considered valid for development review. This is not civil technical sign-off and does not change the pending gate. |
+
+The civil technical validator sign-off remains **PENDING**. This development review log must not be used as evidence for **APPROVED FOR PHASE 1A TECHNICAL WORKING OUTPUT**.
 
 ## Current regression evidence
 
