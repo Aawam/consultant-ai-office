@@ -20,6 +20,30 @@ import {
 } from "@consultant-ai-office/infrastructure";
 import { ExportRabExcelUseCase, type RabWorkbookExporterPort } from "@consultant-ai-office/application";
 import { Pool } from "pg";
+export {
+  OFFICE_WORKFLOW_CONTRACT_VERSION,
+  OFFICE_WORKFLOW_READ_OPERATION,
+  createBrowserRequestContext,
+  createProjectDelivery,
+  officeWorkflowError,
+  officeWorkflowSuccess,
+  parseOfficeWorkflowGetRequest,
+  parseOfficeWorkflowPostRequest,
+  previewProjectForDelivery,
+  toOfficeWorkflowReadModel,
+  type BrowserActorRole,
+  type DeliveryResult,
+  type OfficeProjectView,
+  type OfficeRabView,
+  type OfficeWorkflowAction,
+  type OfficeWorkflowErrorEnvelope,
+  type OfficeWorkflowGetRequest,
+  type OfficeWorkflowPostRequest,
+  type OfficeWorkflowResponseEnvelope,
+  type OfficeWorkflowReadModel,
+  type OfficeWorkflowSuccessEnvelope,
+  type ProjectPreviewForDelivery,
+} from "./delivery";
 
 export interface OfficeRuntimeOptions {
   readonly connectionString: string;
