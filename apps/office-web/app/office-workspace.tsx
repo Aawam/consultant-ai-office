@@ -1,120 +1,228 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type {
+  OfficeRabView,
+  OfficeWorkflowResponseEnvelope,
+  OfficeWorkflowReadModel,
+  ProjectPreviewForDelivery,
+} from "@consultant-ai-office/office-runtime";
 
-export type ProjectPreview =
-  | null
-  | { readonly ok: true; readonly data: { readonly project: { readonly name: string; readonly code: string }; readonly state: string; readonly previewFingerprint: string } }
-  | { readonly ok: false; readonly message: string };
+export type ProjectPreview = ProjectPreviewForDelivery;
 
-type Workspace = "overview" | "rab" | "review" | "activity";
+type Workspace = "overview" | "rab" | "review";
 type Role = "TECHNICAL" | "ADMIN";
-type Status = "DRAFT" | "REVIEW" | "FINAL";
+type Notice = { readonly tone: "success" | "error" | "blocked"; readonly message: string } | null;
+const workflowContractVersion = "office-workflow-v1" as const;
 
 const workspaces: readonly [Workspace, string, string][] = [
-  ["overview", "Overview", "Project context & AI"],
-  ["rab", "RAB / EE", "Estimate workspace"],
-  ["review", "Review / Export", "Validation & approval"],
-  ["activity", "Activity", "Audit & execution history"],
+  ["overview", "Overview", "Project context"],
+  ["rab", "RAB / EE", "One validation workspace"],
+  ["review", "Review & Export", "Snapshot and working output"],
 ];
+
+type MutationData = {
+  readonly project?: { readonly projectId: string };
+  readonly activeContext?: { readonly projectId: string };
+  readonly projectId?: string;
+  readonly rabVersionId?: string;
+};
 
 export function OfficeWorkspace({ preview, code, name }: { preview: ProjectPreview; code: string; name: string }) {
   const [workspace, setWorkspace] = useState<Workspace>("overview");
   const [role, setRole] = useState<Role>("TECHNICAL");
-  const [status, setStatus] = useState<Status>("DRAFT");
-  const [notice, setNotice] = useState("");
-  const [projectId, setProjectId] = useState<string | null>(null);
-  const [rabVersionId, setRabVersionId] = useState<string | null>(null);
+  const [workflow, setWorkflow] = useState<OfficeWorkflowReadModel | null>(null);
   const [loading, setLoading] = useState(true);
+  const [notice, setNotice] = useState<Notice>(null);
   const activeWorkspace = workspaces.find(([key]) => key === workspace)?.[1] ?? "Overview";
-  const notify = (message: string) => setNotice(message);
+  const activeProjectId = workflow?.activeProject?.transport.projectId ?? null;
+  const activeRabId = workflow?.rab?.transport.rabVersionId ?? null;
+  const lifecycle = workflow?.rab?.display.lifecycle ?? null;
+
   const reload = async (ids: { projectId?: string | null; rabVersionId?: string | null } = {}) => {
-    const nextProjectId = ids.projectId ?? projectId ?? new URLSearchParams(window.location.search).get("projectId");
-    const nextRabVersionId = ids.rabVersionId ?? rabVersionId ?? new URLSearchParams(window.location.search).get("rabVersionId");
+    const query = new URLSearchParams();
+    const projectId = ids.projectId ?? activeProjectId ?? new URLSearchParams(window.location.search).get("projectId");
+    const rabVersionId = ids.rabVersionId ?? activeRabId ?? new URLSearchParams(window.location.search).get("rabVersionId");
+    query.set("contractVersion", workflowContractVersion);
+    query.set("operation", "workflow.read");
+    if (projectId) query.set("projectId", projectId);
+    if (rabVersionId) query.set("rabVersionId", rabVersionId);
+
     setLoading(true);
     try {
-      const query = new URLSearchParams();
-      if (nextProjectId) query.set("projectId", nextProjectId);
-      if (nextRabVersionId) query.set("rabVersionId", nextRabVersionId);
       const response = await fetch(`/api/workflow?${query.toString()}`, { headers: { "x-office-role": role } });
-      const result = await response.json() as { ok: boolean; data?: { activeProject?: { projectId: string } | null; rab?: { rabVersionId: string; status: Status } | null }; error?: { message: string } };
-      if (!response.ok || !result.ok) throw new Error(result.error?.message ?? "Workflow reload failed");
-      const activeId = result.data?.activeProject?.projectId ?? nextProjectId ?? null;
-      const loadedRab = result.data?.rab ?? null;
-      setProjectId(activeId);
-      setRabVersionId(loadedRab?.rabVersionId ?? nextRabVersionId ?? null);
-      if (loadedRab) setStatus(loadedRab.status);
+      const result = parseWorkflowEnvelope<OfficeWorkflowReadModel>(await response.json());
+      if (!response.ok || !result.ok) throw new Error(result.ok ? "Workflow reload failed" : result.error.message);
+      setWorkflow(result.data);
       const url = new URL(window.location.href);
-      if (activeId) url.searchParams.set("projectId", activeId);
-      if (loadedRab?.rabVersionId) url.searchParams.set("rabVersionId", loadedRab.rabVersionId);
+      if (result.data.activeProject) url.searchParams.set("projectId", result.data.activeProject.transport.projectId);
+      if (result.data.rab) url.searchParams.set("rabVersionId", result.data.rab.transport.rabVersionId);
       window.history.replaceState({}, "", url);
-    } catch (error) { notify(error instanceof Error ? error.message : "Workflow reload failed"); }
-    finally { setLoading(false); }
+    } catch (error) {
+      setNotice({ tone: "error", message: error instanceof Error ? error.message : "Workflow reload failed" });
+    } finally {
+      setLoading(false);
+    }
   };
-  const mutate = async (action: string, extra: Record<string, string> = {}) => {
+
+  const mutate = async (action: "create_project" | "select_project" | "create_draft" | "submit_review", extra: Record<string, string> = {}) => {
     setLoading(true);
     try {
-      const response = await fetch("/api/workflow", { method: "POST", headers: { "content-type": "application/json", "x-office-role": role }, body: JSON.stringify({ action, projectId, rabVersionId, ...extra }) });
-      const result = await response.json() as { ok: boolean; data?: { project?: { projectId: string }; activeContext?: { projectId: string }; rabVersionId?: string }; error?: { message: string } };
-      if (!response.ok || !result.ok) throw new Error(result.error?.message ?? "Workflow mutation failed");
-      const newProjectId = result.data?.project?.projectId ?? result.data?.activeContext?.projectId ?? projectId;
-      const newRabVersionId = result.data?.rabVersionId ?? rabVersionId;
-      await reload({ projectId: newProjectId, rabVersionId: newRabVersionId });
-      setNotice("Mutation persisted. State loaded again from Application/Repository path.");
-    } catch (error) { notify(error instanceof Error ? error.message : "Workflow mutation failed"); setLoading(false); }
+      const response = await fetch("/api/workflow", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-office-role": role },
+        body: JSON.stringify({ contractVersion: workflowContractVersion, action, projectId: extra.projectId ?? activeProjectId, rabVersionId: extra.rabVersionId ?? activeRabId, ...extra }),
+      });
+      const result = parseWorkflowEnvelope<MutationData>(await response.json());
+      if (!response.ok || !result.ok) throw new Error(result.ok ? "Workflow mutation failed" : result.error.message);
+      const nextProjectId = result.data?.project?.projectId ?? result.data?.activeContext?.projectId ?? result.data?.projectId ?? activeProjectId;
+      const nextRabVersionId = result.data?.rabVersionId ?? activeRabId;
+      await reload({ projectId: nextProjectId, rabVersionId: nextRabVersionId });
+      setNotice({ tone: "success", message: "Saved by Application. The persisted state was loaded again." });
+    } catch (error) {
+      setNotice({ tone: "error", message: error instanceof Error ? error.message : "Workflow mutation failed" });
+      setLoading(false);
+    }
   };
-  useEffect(() => { const timer = window.setTimeout(() => { void reload(); }, 0); return () => window.clearTimeout(timer); // eslint-disable-next-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void reload(); }, 0);
+    return () => window.clearTimeout(timer);
+    // Persisted data is always re-read after a mutation; role is the only reload trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role]);
 
   return <main className="app-shell">
     <aside className="sidebar" aria-label="Global navigation">
-      <div className="brand"><span className="brand-mark" aria-hidden="true">CA</span><div><strong>Consultant AI Office</strong><span>PHASE 0–1 · LOCAL-FIRST</span></div></div>
-      <section className="sidebar-block" aria-labelledby="context-label"><p className="section-label" id="context-label">Application context</p><div className="actor-row"><span className="avatar" aria-hidden="true">{role[0]}</span><div><strong>Operator Lokal</strong><span>{role}</span></div></div><label className="field-label" htmlFor="role">Presentation role</label><select id="role" value={role} onChange={(event) => setRole(event.target.value as Role)}><option>TECHNICAL</option><option>ADMIN</option></select></section>
-      <section className="sidebar-block"><label className="section-label" htmlFor="project-selector">Active project</label><select id="project-selector" disabled aria-describedby="project-help"><option>Belum ada project aktif</option></select><p className="field-help" id="project-help">Selection menunggu runtime composition Application + Infrastructure.</p></section>
-      <nav className="primary-nav" aria-label="Project navigation"><p className="section-label">Project workspace</p>{workspaces.map(([key, label, description]) => <button type="button" className={workspace === key ? "nav-item active" : "nav-item"} key={key} onClick={() => setWorkspace(key)}><span>{label}</span><small>{description}</small></button>)}</nav>
-      <div className="provider-state"><span className="status-dot" aria-hidden="true" /><div><strong>AI provider nonaktif</strong><span>RAB deterministic tetap tersedia</span></div></div>
+      <div className="brand"><span className="brand-mark" aria-hidden="true">CA</span><div><strong>Consultant AI Office</strong><span>PHASE 1A · VALIDATION WORKSPACE</span></div></div>
+      <section className="sidebar-block" aria-labelledby="context-label">
+        <p className="section-label" id="context-label">Application context</p>
+        <div className="actor-row"><span className="avatar" aria-hidden="true">{role[0]}</span><div><strong>Local operator</strong><span>{role}</span></div></div>
+        <label className="field-label" htmlFor="role">Local role context</label>
+        <select id="role" value={role} onChange={(event) => setRole(event.target.value as Role)}><option>TECHNICAL</option><option>ADMIN</option></select>
+      </section>
+      <section className="sidebar-block">
+        <label className="section-label" htmlFor="project-selector">Active project</label>
+        <select
+          id="project-selector"
+          value={activeProjectId ?? ""}
+          disabled={loading || !workflow || workflow.projects.length === 0}
+          onChange={(event) => void mutate("select_project", { projectId: event.target.value })}
+          aria-describedby="project-help"
+        >
+          <option value="">No active saved project</option>
+          {workflow?.projects.map((project) => <option key={project.transport.projectId} value={project.transport.projectId}>{project.display.code} · {project.display.name}</option>)}
+        </select>
+        <p className="field-help" id="project-help">Selection is persisted through the runtime and Application path.</p>
+      </section>
+      <nav className="primary-nav" aria-label="Project navigation">
+        <p className="section-label">Project workspace</p>
+        {workspaces.map(([key, label, description]) => <button type="button" className={workspace === key ? "nav-item active" : "nav-item"} key={key} onClick={() => setWorkspace(key)}><span>{label}</span><small>{description}</small></button>)}
+      </nav>
+      <div className="provider-state"><span className="status-dot" aria-hidden="true" /><div><strong>AI provider disabled</strong><span>Deterministic workflow remains available</span></div></div>
     </aside>
+
     <section className="content">
-      <header className="topbar"><div><p className="eyebrow">CONSULTANT AI OFFICE</p><p className="breadcrumb">Project workspace / {activeWorkspace}</p></div><div className="topbar-meta"><span className="role-badge">{role}</span><span className="state-badge">{status}</span></div></header>
-      <section className="context-strip" aria-labelledby="active-context-title"><div className="context-main"><span className="context-index">01</span><div><p id="active-context-title">Active Project Context</p><strong>{preview && preview.ok ? preview.data.project.name : "Belum dipilih"}</strong><span>{preview && preview.ok ? preview.data.project.code : "Project · RAB version · price context belum tersedia"}</span></div></div><dl><div><dt>RAB version</dt><dd>—</dd></div><div><dt>Lifecycle</dt><dd>{status}</dd></div><div><dt>AI</dt><dd>DISABLED</dd></div></dl></section>
-      {notice && <div className="notice" role="status"><strong>Interaction boundary</strong><span>{notice}</span><button type="button" aria-label="Tutup notifikasi" onClick={() => setNotice("")}>×</button></div>}
-      {loading && <div className="notice" role="status">Loading persisted state…</div>}
-      {workspace === "overview" && <Overview preview={preview} code={code} name={name} onAction={notify} onMutate={mutate} />}
-      {workspace === "rab" && <RabWorkspace status={status} onStatus={setStatus} onAction={notify} />}
-      {workspace === "review" && <ReviewWorkspace role={role} status={status} projectId={projectId} rabVersionId={rabVersionId} onAction={notify} />}
-      {workspace === "activity" && <ActivityWorkspace />}
-      <LiveWorkflowControls projectId={projectId} rabVersionId={rabVersionId} role={role} status={status} loading={loading} onMutate={mutate} />
+      <header className="topbar"><div><p className="eyebrow">CONSULTANT AI OFFICE</p><p className="breadcrumb">Project workspace / {activeWorkspace}</p></div><div className="topbar-meta"><span className="role-badge">{role}</span><span className="state-badge">{lifecycle ?? "NO RAB"}</span></div></header>
+      <ContextHeader workflow={workflow} />
+      {notice && <div className={`notice ${notice.tone}`} role={notice.tone === "error" ? "alert" : "status"}><strong>{notice.tone === "success" ? "Success" : notice.tone === "blocked" ? "Blocked" : "Error"}</strong><span>{notice.message}</span><button type="button" aria-label="Dismiss notice" onClick={() => setNotice(null)}>×</button></div>}
+      {loading && <div className="notice" role="status" aria-live="polite">Loading saved workflow state…</div>}
+      {workspace === "overview" && <Overview preview={preview} code={code} name={name} workflow={workflow} onCreateProject={(project) => mutate("create_project", project)} />}
+      {workspace === "rab" && <RabWorkspace rab={workflow?.rab ?? null} activeProject={workflow?.activeProject ?? null} loading={loading} onCreateDraft={() => void mutate("create_draft", { title: "Browser RAB DRAFT" })} onSubmitReview={() => void mutate("submit_review")} />}
+      {workspace === "review" && <ReviewWorkspace rab={workflow?.rab ?? null} role={role} projectId={activeProjectId} onNotice={setNotice} />}
     </section>
   </main>;
 }
 
-function LiveWorkflowControls({ projectId, rabVersionId, role, status, loading, onMutate }: { projectId: string | null; rabVersionId: string | null; role: Role; status: Status; loading: boolean; onMutate: (action: string, extra?: Record<string, string>) => Promise<void> }) {
-  if (!projectId) return null;
-  return <section className="panel live-controls" aria-labelledby="live-workflow-title"><PanelHeading eyebrow="LIVE APPLICATION WORKFLOW" title="Persisted browser actions" chip={loading ? "LOADING" : "READY"} /><p className="muted">Project ID: <code>{projectId}</code>{rabVersionId ? <> · RAB ID: <code>{rabVersionId}</code></> : null}</p><div className="action-row"><button type="button" disabled={loading || Boolean(rabVersionId)} onClick={() => void onMutate("create_draft", { title: "Browser RAB DRAFT" })}>Create RAB DRAFT</button><button type="button" className="secondary-button" disabled={loading || !rabVersionId || status !== "DRAFT"} onClick={() => void onMutate("submit_review")}>Submit REVIEW</button><button type="button" className="secondary-button" disabled={loading || role !== "ADMIN" || !rabVersionId || status !== "REVIEW"} onClick={() => void onMutate("finalize")}>ADMIN Finalize</button><button type="button" className="secondary-button" disabled={loading || !rabVersionId || status !== "FINAL"} onClick={() => void onMutate("create_revision")}>Create Revision</button></div><p className="field-help">Every action POSTs to server delivery, then reloads state with GET. Disabled controls are presentation only; Application authorization remains authoritative.</p></section>;
+function ContextHeader({ workflow }: { workflow: OfficeWorkflowReadModel | null }) {
+  const project = workflow?.activeProject ?? null;
+  const rab = workflow?.rab ?? null;
+  return <section className="context-strip" aria-labelledby="active-context-title"><div className="context-main"><span className="context-index">01</span><div><p id="active-context-title">Active Project Context</p><strong>{project?.display.name ?? "No saved project selected"}</strong><span>{project ? project.display.code : "Select or create a saved project to start a RAB workspace."}</span></div></div><dl><div><dt>RAB revision</dt><dd>{rab ? `Revision ${rab.display.revisionNumber}` : "—"}</dd></div><div><dt>Lifecycle</dt><dd>{rab?.display.lifecycle ?? "—"}</dd></div><div><dt>Snapshot</dt><dd>{rab?.snapshot.available ? "AVAILABLE" : "—"}</dd></div></dl></section>;
 }
 
-function Overview({ preview, code, name, onAction, onMutate }: { preview: ProjectPreview; code: string; name: string; onAction: (message: string) => void; onMutate: (action: string, extra?: Record<string, string>) => Promise<void> }) {
-  return <><PageHeading eyebrow="DELIVERY / PRESENTATION LAYER" title="AI Office workspace" detail="Structured workspaces remain primary; AI is contextual and optional." /><div className="overview-grid"><section className="panel" aria-labelledby="ai-title"><PanelHeading eyebrow="AI ASSISTANT · AI SUGGESTION" title="Contextual assistant" chip="NOT SAVED" /><label htmlFor="ai-prompt">Ask for search, explanation, or missing-data detection</label><textarea id="ai-prompt" disabled placeholder="AI provider nonaktif — jalur structured workspace tetap tersedia." /><div className="panel-footer"><span>AI tidak menghitung, memfinalkan, atau menulis diam-diam.</span><button type="button" disabled>Ask AI</button></div></section><ProjectPanel preview={preview} code={code} name={name} onAction={onAction} onMutate={onMutate} /></div><section className="panel" aria-labelledby="boundary-title"><PanelHeading eyebrow="INTERACTION MODE CONTRACT" title="One controlled path" chip="APPLICATION LAYER" /><ol className="flow-list"><li><span>01</span><div><strong>Read / Preview</strong><p>UI menampilkan saved data atau deterministic result dari Application Layer.</p></div></li><li><span>02</span><div><strong>Confirm</strong><p>Warning dan consequential action meminta konfirmasi actor yang sesuai.</p></div></li><li><span>03</span><div><strong>Write / Audit</strong><p>Authorization, transaction, lifecycle, dan audit tidak diputuskan di UI.</p></div></li></ol></section></>;
+function Overview({ preview, code, name, workflow, onCreateProject }: { preview: ProjectPreview; code: string; name: string; workflow: OfficeWorkflowReadModel | null; onCreateProject: (project: { code: string; name: string }) => void }) {
+  return <><PageHeading eyebrow="DELIVERY / PRESENTATION LAYER" title="Thin validation workspace" detail="Project context, one RAB workspace, runtime snapshots, validation, lifecycle, and working output." /><div className="overview-grid"><section className="panel" aria-labelledby="project-selection-title"><PanelHeading eyebrow="SAVED PROJECT DATA" title="Project selection" chip="RUNTIME" /><form className="project-form" method="get"><label htmlFor="project-code">Project code</label><input id="project-code" name="code" defaultValue={code} placeholder="Example: BRU-01" maxLength={20} required /><label htmlFor="project-name">Project name</label><input id="project-name" name="name" defaultValue={name} placeholder="Example: Kantor Camat" maxLength={120} required /><button type="submit">Validate preview</button></form>{preview === null && <EmptyState title="No preview yet" detail="Enter a project code and name to request an Application preview." />}{preview && preview.ok && <div className="success-state" role="status"><span className="severity-tag success">SUCCESS</span><h3>{preview.data.project.name}</h3><dl className="data-list"><div><dt>Code</dt><dd>{preview.data.project.code}</dd></div><div><dt>State</dt><dd>{preview.data.state}</dd></div></dl><p>Preview does not persist a project, context, execution, or audit record.</p><button type="button" onClick={() => onCreateProject(preview.data.project)}>Create saved project</button></div>}{preview && !preview.ok && <div className="error-state" role="alert"><span className="severity-tag error">ERROR</span><h3>Preview rejected</h3><p>{preview.message}</p></div>}</section><section className="panel"><PanelHeading eyebrow="ACTIVE CONTEXT" title="Saved projects" chip={workflow ? "LOADED" : "LOADING"} />{workflow && workflow.projects.length > 0 ? <ul className="data-list">{workflow.projects.map((project) => <li key={project.transport.projectId}><strong>{project.display.code}</strong><span>{project.display.name}{workflow.activeProject?.transport.projectId === project.transport.projectId ? " · active" : ""}</span></li>)}</ul> : <EmptyState title="No accessible saved project" detail="The selector becomes available when the runtime returns an accessible project." />}</section></div></>;
 }
 
-function ProjectPanel({ preview, code, name, onAction, onMutate }: { preview: ProjectPreview; code: string; name: string; onAction: (message: string) => void; onMutate: (action: string, extra?: Record<string, string>) => Promise<void> }) {
-  return <section className="panel" aria-labelledby="project-selection-title"><PanelHeading eyebrow="SAVED PROJECT DATA" title="Project selection" chip="PREVIEW" /><form className="project-form" method="get"><label htmlFor="project-code">Kode project</label><input id="project-code" name="code" defaultValue={code} placeholder="Contoh: BRU-01" maxLength={20} required /><label htmlFor="project-name">Nama project</label><input id="project-name" name="name" defaultValue={name} placeholder="Contoh: Kantor Camat" maxLength={120} required /><button type="submit">Validasi &amp; preview</button></form>{preview === null && <EmptyState title="Belum ada preview" detail="Isi kode dan nama untuk validasi domain tanpa mutation." />}{preview && preview.ok && <div className="success-state" role="status"><span className="severity-tag success">SUCCESS</span><h3>{preview.data.project.name}</h3><dl className="data-list"><div><dt>Kode</dt><dd>{preview.data.project.code}</dd></div><div><dt>State</dt><dd>{preview.data.state}</dd></div><div><dt>Fingerprint</dt><dd><code>{preview.data.previewFingerprint}</code></dd></div></dl><p>Preview tidak membuat project, context, execution, atau audit row.</p><div className="action-row"><button type="button" onClick={() => void onMutate("create_project", { code: preview.data.project.code, name: preview.data.project.name })}>Create saved project</button><button type="button" className="secondary-button" onClick={() => onAction("Active project hanya berganti melalui SelectActiveProjectUseCase.")}>Select active project</button></div></div>}{preview && !preview.ok && <div className="error-state" role="alert"><span className="severity-tag error">ERROR</span><h3>Preview ditolak</h3><p>{preview.message}</p></div>}</section>;
+function RabWorkspace({ rab, activeProject, loading, onCreateDraft, onSubmitReview }: { rab: OfficeRabView | null; activeProject: OfficeWorkflowReadModel["activeProject"]; loading: boolean; onCreateDraft: () => void; onSubmitReview: () => void }) {
+  if (!activeProject) return <><PageHeading eyebrow="RAB / EE" title="One RAB workspace" detail="Select a saved project before creating a RAB draft." /><section className="panel"><EmptyState title="Project context required" detail="No RAB command is offered until the runtime returns an active saved project." /></section></>;
+  if (!rab) return <><PageHeading eyebrow="RAB / EE" title="One RAB workspace" detail="The active project has no loaded RAB version." /><section className="panel"><PanelHeading eyebrow="SAVED PROJECT DATA" title="No RAB draft" chip="EMPTY" /><EmptyState title="No RAB selected" detail="Create one DRAFT through the Application workflow to load its saved state." /><button type="button" disabled={loading} onClick={onCreateDraft}>Create RAB DRAFT</button></section></>;
+
+  const canSubmitReview = rab.display.lifecycle === "DRAFT";
+  return <><PageHeading eyebrow="RAB / EE" title={rab.display.title} detail="Values below are read from the runtime response; the UI does not calculate RAB values." /><section className="panel"><div className="workspace-toolbar"><div><PanelHeading eyebrow="RAB SNAPSHOT" title={`Revision ${rab.display.revisionNumber}`} chip={rab.display.lifecycle} /><p className="muted">{rab.snapshot.available ? `Calculation snapshot returned at ${new Date(rab.snapshot.calculatedAt ?? "").toLocaleString()}.` : "No calculation snapshot has been returned for this saved DRAFT."}</p></div><div className="action-row"><button type="button" disabled={loading || !canSubmitReview} onClick={onSubmitReview}>Submit REVIEW</button></div></div><CalculationPreview rab={rab} /><ValidationPanel rab={rab} /></section></>;
 }
 
-function RabWorkspace({ status, onStatus, onAction }: { status: Status; onStatus: (status: Status) => void; onAction: (message: string) => void }) {
-  const locked = status !== "DRAFT";
-  return <><PageHeading eyebrow="RAB / EE" title="Estimate workspace" detail="GROUP → optional SUBGROUP → ITEM. No arbitrary nested subgroup tree." /><div className="workspace-tabs" role="tablist" aria-label="RAB workspace sections"><span className="tab active">Estimate</span><span className="tab">Backup Volume</span><span className="tab">Price Context</span><span className="tab">Validation</span><span className="tab">Review &amp; Export</span><span className="tab">Revisions</span></div><section className="panel"><div className="workspace-toolbar"><div><PanelHeading eyebrow="RAB HIERARCHY" title={locked ? "Locked snapshot" : "Draft estimate"} chip={status} /><p className="muted">{locked ? "REVIEW/FINAL immutable; correction memakai RETURN TO DRAFT." : "Saved project data belum tersedia."}</p></div><div className="action-row"><button type="button" disabled={locked} onClick={() => onAction("CreateRabDraftUseCase memerlukan active project dan adapter runtime.")}>+ Group</button><button type="button" className="secondary-button" disabled={locked} onClick={() => onAction("Add item akan memakai Application Use Case setelah RAB DRAFT tersedia.")}>+ Item</button></div></div><div className="hierarchy-grid"><div className="empty-workspace"><span aria-hidden="true">＋</span><h3>{locked ? "RAB snapshot locked" : "Belum ada Group"}</h3><p>{locked ? "Source, calculation, dan validation evidence ditampilkan di REVIEW." : "Official AHSP, Backup Volume, Direct Volume, dan MANUAL/NON-AHSP tersedia sebagai structured paths."}</p></div><div className="source-card"><span className="severity-tag info">INFO</span><h3>Item source paths</h3><div className="source-option active"><strong>OFFICIAL AHSP</strong><span>AHSP search · HSP detail · base-price context</span></div><div className="source-option"><strong>BACKUP VOLUME</strong><span>Measurement rows → deterministic BV total</span></div><div className="source-option warning"><strong>DIRECT VOLUME</strong><span>Exception · volume, unit, basis, provenance, notes</span></div><div className="source-option warning"><strong>MANUAL / NON-AHSP</strong><span>manual_hsp + provenance · no fake breakdown</span></div></div></div><div className="result-strip"><div><span className="eyebrow">DETERMINISTIC RESULT</span><strong>Calculation snapshot unavailable</strong><span>UI tidak menghitung HSP, subtotal, PPN, atau final rounding.</span></div><button type="button" className="secondary-button" onClick={() => onStatus(status === "DRAFT" ? "REVIEW" : status === "REVIEW" ? "FINAL" : "DRAFT")}>Preview {status === "FINAL" ? "DRAFT" : status === "DRAFT" ? "REVIEW" : "FINAL"} presentation</button></div></section></>;
+function CalculationPreview({ rab }: { rab: OfficeRabView }) {
+  if (!rab.calculation) return <EmptyState title="No deterministic result returned" detail="Calculation values appear only after the Application workflow returns a saved calculation snapshot." />;
+  const { totals } = rab.calculation;
+  return <section className="result-strip" aria-labelledby="calculation-preview-title"><div><span className="eyebrow">DETERMINISTIC RESULT</span><strong id="calculation-preview-title">Calculation preview from saved snapshot</strong><span>No subtotal, tax, or rounding is calculated in this browser.</span></div><dl className="data-list"><div><dt>RAB subtotal</dt><dd>{totals.subtotalRab}</dd></div><div><dt>PPN</dt><dd>{totals.ppnValue}</dd></div><div><dt>Before rounding</dt><dd>{totals.totalBeforeRounding}</dd></div><div><dt>Final result</dt><dd>{totals.totalFinal}</dd></div></dl></section>;
 }
 
-function ReviewWorkspace({ role, status, projectId, rabVersionId, onAction }: { role: Role; status: Status; projectId: string | null; rabVersionId: string | null; onAction: (message: string) => void }) {
-  const final = status === "FINAL";
-  return <><PageHeading eyebrow="REVIEW / EXPORT" title="Lifecycle &amp; approval" detail="DRAFT → REVIEW → FINAL. Approval is a control event, not a persisted state." /><section className="status-timeline" aria-label="Lifecycle status"><span className={status === "DRAFT" ? "current" : "complete"}>DRAFT</span><i aria-hidden="true">→</i><span className={status === "REVIEW" ? "current" : final ? "complete" : "pending"}>REVIEW</span><i aria-hidden="true">→</i><span className={final ? "current" : "pending"}>FINAL</span></section><div className="review-grid"><section className="panel"><PanelHeading eyebrow="VALIDATION" title="Backend evidence" chip="0 ERROR · 2 WARNING" /><Finding severity="ERROR" title="No active RAB" detail="Create a DRAFT before submit. Consequence: REVIEW blocked." /><Finding severity="WARNING" title="Direct Volume / Manual path" detail="Traceability and reviewer confirmation are required before FINAL." /><Finding severity="INFO" title="Snapshot protection" detail="REVIEW and FINAL show locked source and calculation snapshots." /></section><section className="panel"><PanelHeading eyebrow="ROLE-AWARE ACTIONS" title="Available controls" chip={role} /><div className="action-stack"><button type="button" disabled={role !== "ADMIN" || status !== "REVIEW"} onClick={() => onAction("FinalizeRabUseCase: ADMIN confirmation of every required WARNING is required.")}>Confirm warnings &amp; FINAL</button><button type="button" className="secondary-button" disabled={role !== "ADMIN" || status !== "REVIEW"} onClick={() => onAction("ReturnRabToDraftUseCase dipanggil untuk version yang sama.")}>Return to DRAFT</button><button type="button" className="secondary-button" disabled={!final || (role !== "ADMIN" && role !== "TECHNICAL")} onClick={() => onAction("CreateRabRevisionUseCase membuat DRAFT version baru; FINAL tetap immutable.")}>Create revision</button></div><p className="field-help">UI visibility bukan authorization. Application Layer tetap security boundary.</p></section></div><ExportPanel role={role} status={status} projectId={projectId} rabVersionId={rabVersionId} onAction={onAction} /></>;
+function ValidationPanel({ rab }: { rab: OfficeRabView }) {
+  if (!rab.validation) return <section className="panel"><PanelHeading eyebrow="VALIDATION" title="No validation result returned" chip="NOT RUN" /><p className="muted">Validation evidence is shown only when returned by Application.</p></section>;
+  const issues = rab.validation.issues;
+  return <section className="panel"><PanelHeading eyebrow="VALIDATION" title="Application evidence" chip={rab.validation.reviewBlocked ? "REVIEW BLOCKED" : "REVIEW READY"} />{issues.length === 0 ? <div className="success-state" role="status"><span className="severity-tag success">SUCCESS</span><p>No validation issue was returned by Application.</p></div> : <div className="action-stack">{issues.map((issue, index) => <Finding key={`${issue.severity}-${index}`} severity={issue.severity} detail={issue.message} reviewBlocked={rab.validation?.reviewBlocked ?? false} />)}</div>}</section>;
 }
 
-function ExportPanel({ role, status, projectId, rabVersionId, onAction }: { role: Role; status: Status; projectId: string | null; rabVersionId: string | null; onAction: (message: string) => void }) { const requestExport = async (exportType: "WORKING" | "OFFICIAL") => { if (!projectId || !rabVersionId) { onAction("Pilih project dan RAB version sebelum membuat working export."); return; } onAction("Membuat workbook Excel…"); const response = await fetch("/api/workflow", { method: "POST", headers: { "content-type": "application/json", "x-office-role": role }, body: JSON.stringify({ action: "export_excel", projectId, rabVersionId, exportType }) }); const result = await response.json() as { ok: boolean; data?: { artifact: { filePath: string; artifactId: string }; bytesBase64: string }; error?: { message: string } }; if (!response.ok || !result.ok || !result.data) { onAction(result.error?.message ?? "Excel export failed"); return; } const bytes = Uint8Array.from(atob(result.data.bytesBase64), (character) => character.charCodeAt(0)); const url = URL.createObjectURL(new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })); const anchor = document.createElement("a"); anchor.href = url; anchor.download = result.data.artifact.filePath.split("/").pop() ?? `${exportType.toLowerCase()}-rab.xlsx`; anchor.click(); URL.revokeObjectURL(url); onAction(`Excel ${exportType.toLowerCase()} berhasil dibuat · ${result.data.artifact.artifactId}`); }; return <section className="panel export-panel"><PanelHeading eyebrow="EXPORT WORKSPACE" title="Separate output contracts" chip="LIVE XLSX" /><div className="export-grid"><div><span className="severity-tag info">WORKING EXPORT · NOT OFFICIAL</span><p>Allowed for DRAFT/REVIEW and TECHNICAL/ADMIN.</p><button type="button" className="secondary-button" disabled={status === "FINAL" || !projectId || !rabVersionId} onClick={() => void requestExport("WORKING")}>Export working Excel</button></div><div><span className="severity-tag warning">OFFICIAL EXPORT</span><p>ADMIN + FINAL only. Bound to the FINAL snapshot.</p><button type="button" className="secondary-button" disabled={role !== "ADMIN" || status !== "FINAL"} onClick={() => void requestExport("OFFICIAL")}>Export official Excel</button></div></div></section>; }
+function ReviewWorkspace({ rab, role, projectId, onNotice }: { rab: OfficeRabView | null; role: Role; projectId: string | null; onNotice: (notice: Notice) => void }) {
+  if (!rab) return <><PageHeading eyebrow="REVIEW & EXPORT" title="Snapshot review" detail="A saved RAB version is required." /><section className="panel"><EmptyState title="No RAB snapshot loaded" detail="Create and submit a RAB to REVIEW to inspect Application validation and deterministic result evidence." /></section></>;
+  const lifecycle = rab.display.lifecycle;
+  return <><PageHeading eyebrow="REVIEW & EXPORT" title="Snapshot review" detail="Lifecycle, validation, and calculation values are supplied by the runtime read model." /><section className="status-timeline" aria-label="Persisted lifecycle status"><span className={lifecycle === "DRAFT" ? "current" : "complete"}>DRAFT</span><i aria-hidden="true">→</i><span className={lifecycle === "REVIEW" ? "current" : lifecycle === "FINAL" ? "complete" : "pending"}>REVIEW</span><i aria-hidden="true">→</i><span className={lifecycle === "FINAL" ? "current" : "pending"}>FINAL</span></section><div className="review-grid"><section className="panel"><PanelHeading eyebrow="SNAPSHOT" title={rab.snapshot.available ? "Persisted calculation snapshot" : "No persisted calculation snapshot"} chip={rab.snapshot.available ? "AVAILABLE" : "PENDING"} /><p>{rab.snapshot.available ? "The current runtime response contains a deterministic snapshot for this RAB state." : "No snapshot is presented as acceptance data before Application returns it."}</p></section><section className="panel"><PanelHeading eyebrow="BASIC APPROVAL" title="Application-controlled review" chip={role} /><p>{lifecycle === "REVIEW" ? `REVIEW is persisted. Confirmed warning records returned: ${rab.approval.confirmedWarningCount}.` : lifecycle === "FINAL" ? "FINAL is read-only. Official Export is outside Phase 1A." : "Submit REVIEW is available from the RAB workspace after Application validation succeeds."}</p><p className="field-help">No approval, authorization, lifecycle, or validation decision is made in the browser.</p></section></div><ValidationPanel rab={rab} /><WorkingExportPanel role={role} lifecycle={lifecycle} projectId={projectId} rabVersionId={rab.transport.rabVersionId} onNotice={onNotice} /></>;
+}
 
-function ActivityWorkspace() { return <><PageHeading eyebrow="ACTIVITY" title="Audit &amp; execution history" detail="Project activity ditampilkan dari GetActiveProjectHistoryUseCase." /><section className="panel"><PanelHeading eyebrow="SAVED PROJECT DATA" title="No active project" chip="EMPTY" /><EmptyState title="Belum ada activity" detail="Pilih project aktif untuk memuat who, when, target, action, dan result tanpa mengarang records." /></section></>; }
-function Finding({ severity, title, detail }: { severity: "ERROR" | "WARNING" | "INFO"; title: string; detail: string }) { return <div className="finding"><span className={`severity-tag ${severity.toLowerCase()}`}>{severity}</span><div><strong>{title}</strong><p>{detail}</p><small>Required action: follow Application workflow</small></div></div>; }
-function PageHeading({ eyebrow, title, detail }: { eyebrow: string; title: string; detail: string }) { return <header className="page-heading"><div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1><p className="lede">{detail}</p></div><span className="outline-badge">NO DIRECT DB ACCESS</span></header>; }
+function WorkingExportPanel({ role, lifecycle, projectId, rabVersionId, onNotice }: { role: Role; lifecycle: OfficeRabView["display"]["lifecycle"]; projectId: string | null; rabVersionId: string; onNotice: (notice: Notice) => void }) {
+  const isBlocked = lifecycle === "FINAL" || projectId === null;
+  const blockedReason = lifecycle === "FINAL" ? "Working Export is blocked because the runtime reports FINAL. This Phase 1A workspace supports DRAFT and REVIEW working output only." : "Working Export is blocked until an active saved project is returned by the runtime.";
+  const requestWorkingExport = async () => {
+    if (isBlocked) {
+      onNotice({ tone: "blocked", message: blockedReason });
+      return;
+    }
+    onNotice({ tone: "success", message: "Creating the Working Excel file from the persisted runtime snapshot…" });
+    try {
+      const response = await fetch("/api/workflow", { method: "POST", headers: { "content-type": "application/json", "x-office-role": role }, body: JSON.stringify({ contractVersion: workflowContractVersion, action: "export_excel", projectId, rabVersionId, exportType: "WORKING" }) });
+      const result = parseWorkflowEnvelope<{ readonly artifact: { readonly filePath: string }; readonly bytesBase64: string }>(await response.json());
+      if (!response.ok || !result.ok) throw new Error(result.ok ? "Working Excel export failed" : result.error.message);
+      const bytes = Uint8Array.from(atob(result.data.bytesBase64), (character) => character.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = result.data.artifact.filePath.split("/").pop() ?? "working-rab.xlsx";
+      anchor.click();
+      URL.revokeObjectURL(url);
+      onNotice({ tone: "success", message: "Working Excel downloaded from the persisted RAB snapshot. NOT OFFICIAL." });
+    } catch (error) {
+      onNotice({ tone: "error", message: error instanceof Error ? error.message : "Working Excel export failed" });
+    }
+  };
+
+  return <section className="panel export-panel"><PanelHeading eyebrow="EXPORT WORKSPACE" title="Working output only" chip="PHASE 1A" /><div className="export-grid"><div><span className="severity-tag info">WORKING EXPORT · NOT OFFICIAL</span><p>Available only for DRAFT or REVIEW returned by Application.</p><button type="button" className="secondary-button" disabled={isBlocked} onClick={() => void requestWorkingExport()}>Export working Excel</button>{isBlocked && <p className="field-help" role="status">{blockedReason}</p>}</div><div><span className="severity-tag warning">OFFICIAL EXPORT</span><p>Official Export unavailable in Phase 1A. It is deliberately deferred and has no executable UI action.</p><button type="button" className="secondary-button" disabled aria-describedby="official-export-help">Official Export unavailable</button><p id="official-export-help" className="field-help">No official-output request is sent from this workspace.</p></div></div></section>;
+}
+
+function Finding({ severity, detail, reviewBlocked }: { severity: "ERROR" | "WARNING" | "INFO"; detail: string; reviewBlocked: boolean }) {
+  const consequence = severity === "ERROR" && reviewBlocked ? "Consequence: Application blocks REVIEW." : severity === "WARNING" ? "Consequence: reviewer attention is required by Application." : "Consequence: informational evidence.";
+  return <div className="finding"><span className={`severity-tag ${severity.toLowerCase()}`}>{severity}</span><div><strong>{consequence}</strong><p>{detail}</p></div></div>;
+}
+
+function parseWorkflowEnvelope<T>(value: unknown): OfficeWorkflowResponseEnvelope<T> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error("Invalid workflow response envelope");
+  }
+  const envelope = value as Record<string, unknown>;
+  if (envelope.contractVersion !== workflowContractVersion) {
+    throw new Error("Unsupported workflow response contract version");
+  }
+  if (envelope.ok === true && "data" in envelope) return value as OfficeWorkflowResponseEnvelope<T>;
+  if (
+    envelope.ok === false
+    && typeof envelope.error === "object"
+    && envelope.error !== null
+    && typeof (envelope.error as Record<string, unknown>).code === "string"
+    && typeof (envelope.error as Record<string, unknown>).message === "string"
+  ) return value as OfficeWorkflowResponseEnvelope<T>;
+  throw new Error("Invalid workflow response envelope");
+}
+
+function PageHeading({ eyebrow, title, detail }: { eyebrow: string; title: string; detail: string }) { return <header className="page-heading"><div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1><p className="lede">{detail}</p></div><span className="outline-badge">RUNTIME → APPLICATION</span></header>; }
 function PanelHeading({ eyebrow, title, chip }: { eyebrow: string; title: string; chip?: string }) { return <div className="panel-heading"><div><p className="section-label">{eyebrow}</p><h2>{title}</h2></div>{chip && <span className="mode-chip">{chip}</span>}</div>; }
 function EmptyState({ title, detail }: { title: string; detail: string }) { return <div className="empty-state" role="status"><span aria-hidden="true">—</span><div><h3>{title}</h3><p>{detail}</p></div></div>; }
