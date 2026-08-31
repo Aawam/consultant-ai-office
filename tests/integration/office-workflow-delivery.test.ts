@@ -15,7 +15,7 @@ describe("browser workflow delivery boundary", () => {
   const runtime = createOfficeRuntime({ connectionString, maxConnections: 2 });
 
   beforeAll(async () => {
-    await runtime.pool.query("TRUNCATE office.audit_events, office.tool_executions, office.rab_versions, office.active_project_contexts, office.project_memberships, office.projects CASCADE");
+    await runtime.pool.query("TRUNCATE office.export_artifacts, office.audit_events, office.tool_executions, office.rab_versions, office.active_project_contexts, office.project_memberships, office.projects CASCADE");
   });
   afterAll(() => runtime.close());
 
@@ -60,5 +60,23 @@ describe("browser workflow delivery boundary", () => {
     const response = await post({ action: "create_draft" });
     expect(response.status).toBe(422);
     expect(await json<{ ok: false; error: { code: string } }>(response)).toMatchObject({ ok: false, error: { code: "VALIDATION_ERROR" } });
+  });
+
+  it("returns a working export from the persisted RAB calculation snapshot", async () => {
+    const projectResponse = await post({ action: "create_project", code: "DELIVERY-EXP", name: "Delivery Export" });
+    const project = await json<{ data: { project: { projectId: string } } }>(projectResponse);
+    const projectId = project.data.project.projectId;
+    const draftResponse = await post({ action: "create_draft", projectId, title: "Export draft" });
+    const draft = await json<{ data: { rabVersionId: string } }>(draftResponse);
+    const reviewResponse = await post({ action: "submit_review", projectId, rabVersionId: draft.data.rabVersionId });
+    expect(reviewResponse.status).toBe(200);
+    const review = await json<{ data: { status: string; calculationSnapshot: { exportSnapshot: { snapshotId: string } } } }>(reviewResponse);
+    expect(review.data.status).toBe("REVIEW");
+
+    const response = await post({ action: "export_excel", projectId, rabVersionId: draft.data.rabVersionId, exportType: "WORKING" });
+    const result = await json<{ ok: boolean; data?: { artifact: { exportType: string; rabVersionId: string; snapshotId: string }; bytesBase64: string }; error?: { code: string; message: string } }>(response);
+    if (!result.ok) throw new Error(`Working export failed: ${result.error?.code ?? "unknown"}: ${result.error?.message ?? "unknown"}`);
+    expect(response.status).toBe(200);
+    expect(result.data).toMatchObject({ artifact: { exportType: "WORKING", rabVersionId: draft.data.rabVersionId, snapshotId: review.data.calculationSnapshot.exportSnapshot.snapshotId }, bytesBase64: expect.any(String) });
   });
 });

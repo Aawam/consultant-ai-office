@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Pool } from "pg";
@@ -31,5 +31,29 @@ describe("PostgreSQL export artifact persistence", () => {
     expect(count.rows[0]?.count).toBe("2");
     expect(first.filePath).not.toBe(second.filePath);
     expect(first.sha256).toBe(second.sha256);
+  });
+
+  it("removes a working artifact when PostgreSQL persistence fails", async () => {
+    const failureRoot = await mkdtemp(join(tmpdir(), "consultant-ai-office-artifact-failure-"));
+    const storage = new PostgresArtifactStorage(pool, failureRoot);
+    const invalidRecord: ArtifactRecord = {
+      artifactId: "not-a-uuid",
+      projectId,
+      rabVersionId,
+      snapshotId: "rab-working-snapshot",
+      exportType: "WORKING",
+      status: "REVIEW",
+      generatedBy: "technical",
+      generatedAt: new Date("2026-08-31T00:00:00.000Z"),
+      filePath: "",
+      sha256: "",
+    };
+
+    try {
+      await expect(storage.save(invalidRecord, new Uint8Array([1, 2, 3]))).rejects.toThrow();
+      await expect(readdir(failureRoot)).resolves.toEqual([]);
+    } finally {
+      await rm(failureRoot, { recursive: true, force: true });
+    }
   });
 });

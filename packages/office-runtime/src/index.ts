@@ -18,7 +18,7 @@ import {
   ExcelJsRabWorkbookExporter,
   PostgresArtifactStorage,
 } from "@consultant-ai-office/infrastructure";
-import { ExportRabExcelUseCase } from "@consultant-ai-office/application";
+import { ExportRabExcelUseCase, type RabWorkbookExporterPort } from "@consultant-ai-office/application";
 import { Pool } from "pg";
 
 export interface OfficeRuntimeOptions {
@@ -27,6 +27,7 @@ export interface OfficeRuntimeOptions {
   readonly ids?: { readonly next: () => string };
   readonly maxConnections?: number;
   readonly artifactRoot?: string;
+  readonly workbookExporter?: RabWorkbookExporterPort;
 }
 
 export interface OfficeRuntime {
@@ -77,7 +78,7 @@ export function createOfficeRuntime(options: OfficeRuntimeOptions): OfficeRuntim
       returnToDraft: new ReturnRabToDraftUseCase(rabAdapters.rabs, rabAdapters.transaction, clock),
       finalize: new FinalizeRabUseCase(rabAdapters.rabs, rabAdapters.transaction, clock),
       createRevision: new CreateRabRevisionUseCase(rabAdapters.rabs, rabAdapters.transaction, clock, ids),
-      exportExcel: new ExportRabExcelUseCase({ rabs: rabAdapters.rabs, projects: projectAdapters.exportSource, exporter: new ExcelJsRabWorkbookExporter(), artifacts: new PostgresArtifactStorage(pool, options.artifactRoot ?? "storage/artifacts"), clock, ids }),
+      exportExcel: new ExportRabExcelUseCase({ rabs: rabAdapters.rabs, projects: projectAdapters.exportSource, exporter: options.workbookExporter ?? new ExcelJsRabWorkbookExporter(), artifacts: new PostgresArtifactStorage(pool, options.artifactRoot ?? "storage/artifacts"), clock, ids }),
     },
     close: () => pool.end(),
   });
