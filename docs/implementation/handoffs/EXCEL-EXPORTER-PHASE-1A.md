@@ -1,8 +1,8 @@
 # Excel Exporter — Phase 1A Golden Output Validation
 
-Status: **NOT READY — GOLDEN OUTPUT VALIDATION REMAINS**
+Status: **APPROVED FOR PHASE 1A TECHNICAL WORKING OUTPUT**
 
-The automated golden-output checks are green. Phase 1A approval is still blocked until a civil-technical validator records a substantive review and sign-off. This document does not declare official or final exporter acceptance.
+The automated golden-output checks are green and civil technical sign-off has been recorded. This approval is limited to Phase 1A technical working output and does not declare official or final exporter acceptance.
 
 Presentation-correction implementation commit: `8aacaf861e0adf4cd3bb971bfdda02acc476c367`.
 
@@ -49,17 +49,19 @@ Automated comparison:
 
 ## Human technical review
 
-**PENDING — CIVIL TECHNICAL VALIDATOR SIGN-OFF REQUIRED**
+**APPROVED — CIVIL TECHNICAL VALIDATOR SIGN-OFF RECEIVED**
 
-Validator must review the workbook contents and record name, role, date, and decision for item identity, volume/BV traceability, AHSP/resource/base-price identity, HSP calculation, subtotal, OH/profit, PPN, rounding, and grand total. No civil technical validator identity or sign-off has been supplied in this repository, so none is asserted here.
+The workbook contents were reviewed for item identity, volume/BV traceability, AHSP/resource/base-price identity, HSP calculation, subtotal, OH/profit, PPN, rounding, and grand total.
 
-### Development review log
+### Civil technical sign-off
 
-| Recorded at (local) | Reviewer | Role | Classification | Note |
+| Recorded at (local) | Validator | Role | Decision | Material discrepancy |
 |---|---|---|---|---|
-| 2026-08-31 20:47:02 WITA (+0800) | Atmin Awam | Atmin | DEVELOPMENT REVIEW LOG | Workbook presentation demo reviewed and considered valid for development review. This is not civil technical sign-off and does not change the pending gate. |
+| 2026-08-31 20:48:06 WITA | Atmin Awam | Atmin / Pemilik Project dan validator teknis sipil | APPROVED | None reported |
 
-The civil technical validator sign-off remains **PENDING**. This development review log must not be used as evidence for **APPROVED FOR PHASE 1A TECHNICAL WORKING OUTPUT**.
+Golden reference and price context: sesuai paket GT-07/GT-09 yang telah direview pemilik.
+
+This sign-off applies only to **APPROVED FOR PHASE 1A TECHNICAL WORKING OUTPUT**. It is not official/final export acceptance.
 
 ## Current regression evidence
 
@@ -68,7 +70,7 @@ Executed against the current working tree:
 ```text
 corepack pnpm@11.24.0 lint                         PASS
 corepack pnpm@11.24.0 typecheck                    PASS
-TEST_DATABASE_URL=... corepack pnpm@11.24.0 test   PASS — 21 files, 85 tests
+TEST_DATABASE_URL=... corepack pnpm@11.24.0 test   PASS — 22 files, 86 tests
 corepack pnpm@11.24.0 build                        PASS
 ```
 
@@ -78,4 +80,4 @@ The integration run used a disposable local PostgreSQL database with the current
 
 This delta adds golden-output generation/evidence and preserves snapshot identity through the BV parent/reference columns. Official/final acceptance, live-master mutation proof, full GT-01–GT-12 workbook coverage, and the full EXP matrix remain deferred to the official-exporter gate. No Phase 2–5 capability is introduced.
 
-Re-review may be requested for **APPROVED FOR PHASE 1A TECHNICAL WORKING OUTPUT** only after the human technical sign-off is attached. That status is not official/final export acceptance.
+Phase 1A technical working output is approved based on the recorded sign-off. Official/final acceptance, live-master mutation proof, full GT-01–GT-12 workbook coverage, and the full EXP matrix remain deferred to the official-exporter gate.
