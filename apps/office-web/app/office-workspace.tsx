@@ -10,13 +10,13 @@ import type {
 
 export type ProjectPreview = ProjectPreviewForDelivery;
 
-type Workspace = "overview" | "rab" | "review";
+type Workspace = "home" | "projects" | "project" | "rab" | "edit" | "export" | "review";
 type Role = "TECHNICAL" | "ADMIN";
 type Notice = { readonly tone: "success" | "error" | "blocked"; readonly message: string } | null;
 const workflowContractVersion = "office-workflow-v1" as const;
 
 const workspaces: readonly [Workspace, string, string][] = [
-  ["overview", "Overview", "Project context"],
+  ["home", "Overview", "Project context"],
   ["rab", "RAB / EE", "One validation workspace"],
   ["review", "Review & Export", "Snapshot and working output"],
 ];
@@ -28,20 +28,20 @@ type MutationData = {
   readonly rabVersionId?: string;
 };
 
-export function OfficeWorkspace({ preview, code, name }: { preview: ProjectPreview; code: string; name: string }) {
-  const [workspace, setWorkspace] = useState<Workspace>("overview");
+export function OfficeWorkspace({ preview, code, name, routeView = "home", initialProjectId = null }: { preview: ProjectPreview; code: string; name: string; routeView?: Workspace; initialProjectId?: string | null }) {
+  const [workspace, setWorkspace] = useState<Workspace>(routeView);
   const [role, setRole] = useState<Role>("TECHNICAL");
   const [workflow, setWorkflow] = useState<OfficeWorkflowReadModel | null>(null);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<Notice>(null);
-  const activeWorkspace = workspaces.find(([key]) => key === workspace)?.[1] ?? "Overview";
+  const activeWorkspace = ({ home: "Home", projects: "Proyek", project: "Project detail", rab: "RAB / EE", edit: "RAB / EE · Edit view", export: "Working Export", review: "Review & Export" } as const)[workspace];
   const activeProjectId = workflow?.activeProject?.transport.projectId ?? null;
   const activeRabId = workflow?.rab?.transport.rabVersionId ?? null;
   const lifecycle = workflow?.rab?.display.lifecycle ?? null;
 
   const reload = async (ids: { projectId?: string | null; rabVersionId?: string | null } = {}) => {
     const query = new URLSearchParams();
-    const projectId = ids.projectId ?? activeProjectId ?? new URLSearchParams(window.location.search).get("projectId");
+    const projectId = ids.projectId ?? activeProjectId ?? initialProjectId ?? new URLSearchParams(window.location.search).get("projectId");
     const rabVersionId = ids.rabVersionId ?? activeRabId ?? new URLSearchParams(window.location.search).get("rabVersionId");
     query.set("contractVersion", workflowContractVersion);
     query.set("operation", "workflow.read");
@@ -90,11 +90,11 @@ export function OfficeWorkspace({ preview, code, name }: { preview: ProjectPrevi
     return () => window.clearTimeout(timer);
     // Persisted data is always re-read after a mutation; role is the only reload trigger.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [role]);
+  }, [role, initialProjectId]);
 
   return <main className="app-shell">
     <aside className="sidebar" aria-label="Global navigation">
-      <div className="brand"><span className="brand-mark" aria-hidden="true">CA</span><div><strong>Consultant AI Office</strong><span>PHASE 1A · VALIDATION WORKSPACE</span></div></div>
+      <div className="brand"><span className="brand-mark" aria-hidden="true">CA</span><div><strong>Consultant Office AI</strong></div></div>
       <section className="sidebar-block" aria-labelledby="context-label">
         <p className="section-label" id="context-label">Application context</p>
         <div className="actor-row"><span className="avatar" aria-hidden="true">{role[0]}</span><div><strong>Local operator</strong><span>{role}</span></div></div>
@@ -117,7 +117,10 @@ export function OfficeWorkspace({ preview, code, name }: { preview: ProjectPrevi
       </section>
       <nav className="primary-nav" aria-label="Project navigation">
         <p className="section-label">Project workspace</p>
-        {workspaces.map(([key, label, description]) => <button type="button" className={workspace === key ? "nav-item active" : "nav-item"} key={key} onClick={() => setWorkspace(key)}><span>{label}</span><small>{description}</small></button>)}
+        <a className={workspace === "home" ? "nav-item active" : "nav-item"} href="/"><span>Home</span><small>Application entry</small></a>
+        <a className={workspace === "projects" ? "nav-item active" : "nav-item"} href="/projects"><span>Proyek</span><small>Saved project list</small></a>
+        {activeProjectId && <a className={workspace === "project" ? "nav-item active" : "nav-item"} href={`/projects/${activeProjectId}`}><span>Project detail</span><small>Active context</small></a>}
+        {workspaces.filter(([key]) => key !== "home").map(([key, label, description]) => <button type="button" className={workspace === key ? "nav-item active" : "nav-item"} key={key} onClick={() => setWorkspace(key)}><span>{label}</span><small>{description}</small></button>)}
       </nav>
       <div className="provider-state"><span className="status-dot" aria-hidden="true" /><div><strong>AI provider disabled</strong><span>Deterministic workflow remains available</span></div></div>
     </aside>
@@ -127,9 +130,11 @@ export function OfficeWorkspace({ preview, code, name }: { preview: ProjectPrevi
       <ContextHeader workflow={workflow} />
       {notice && <div className={`notice ${notice.tone}`} role={notice.tone === "error" ? "alert" : "status"}><strong>{notice.tone === "success" ? "Success" : notice.tone === "blocked" ? "Blocked" : "Error"}</strong><span>{notice.message}</span><button type="button" aria-label="Dismiss notice" onClick={() => setNotice(null)}>×</button></div>}
       {loading && <div className="notice" role="status" aria-live="polite">Loading saved workflow state…</div>}
-      {workspace === "overview" && <Overview preview={preview} code={code} name={name} workflow={workflow} onCreateProject={(project) => mutate("create_project", project)} />}
-      {workspace === "rab" && <RabWorkspace rab={workflow?.rab ?? null} activeProject={workflow?.activeProject ?? null} loading={loading} onCreateDraft={() => void mutate("create_draft", { title: "Browser RAB DRAFT" })} onSubmitReview={() => void mutate("submit_review")} />}
-      {workspace === "review" && <ReviewWorkspace rab={workflow?.rab ?? null} role={role} projectId={activeProjectId} onNotice={setNotice} />}
+      {workspace === "home" && <Overview preview={preview} code={code} name={name} workflow={workflow} onCreateProject={(project) => mutate("create_project", project)} />}
+      {workspace === "projects" && <ProjectList workflow={workflow} />}
+      {workspace === "project" && <ProjectDetail workflow={workflow} />}
+      {(workspace === "rab" || workspace === "edit") && <RabWorkspace rab={workflow?.rab ?? null} activeProject={workflow?.activeProject ?? null} loading={loading} readOnly onCreateDraft={() => void mutate("create_draft", { title: "Browser RAB DRAFT" })} onSubmitReview={() => void mutate("submit_review")} />}
+      {(workspace === "export" || workspace === "review") && <ReviewWorkspace rab={workflow?.rab ?? null} role={role} projectId={activeProjectId} readOnly={workspace === "export"} onNotice={setNotice} />}
     </section>
   </main>;
 }
@@ -140,16 +145,26 @@ function ContextHeader({ workflow }: { workflow: OfficeWorkflowReadModel | null 
   return <section className="context-strip" aria-labelledby="active-context-title"><div className="context-main"><span className="context-index">01</span><div><p id="active-context-title">Active Project Context</p><strong>{project?.display.name ?? "No saved project selected"}</strong><span>{project ? project.display.code : "Select or create a saved project to start a RAB workspace."}</span></div></div><dl><div><dt>RAB revision</dt><dd>{rab ? `Revision ${rab.display.revisionNumber}` : "—"}</dd></div><div><dt>Lifecycle</dt><dd>{rab?.display.lifecycle ?? "—"}</dd></div><div><dt>Snapshot</dt><dd>{rab?.snapshot.available ? "AVAILABLE" : "—"}</dd></div></dl></section>;
 }
 
+function ProjectList({ workflow }: { workflow: OfficeWorkflowReadModel | null }) {
+  return <><PageHeading eyebrow="PROYEK" title="Saved project list" detail="Project context is read from the existing runtime/Application response." /><section className="panel"><PanelHeading eyebrow="SAVED PROJECT DATA" title="Accessible projects" chip={workflow ? "LOADED" : "LOADING"} />{workflow && workflow.projects.length > 0 ? <ul className="project-list">{workflow.projects.map((project) => <li key={project.transport.projectId}><a href={`/projects/${project.transport.projectId}`}><strong>{project.display.code}</strong><span>{project.display.name}</span></a></li>)}</ul> : <EmptyState title="No accessible saved project" detail="The runtime returned no project available in the current context." />}</section></>;
+}
+
+function ProjectDetail({ workflow }: { workflow: OfficeWorkflowReadModel | null }) {
+  const project = workflow?.activeProject ?? null;
+  if (!project) return <><PageHeading eyebrow="PROYEK" title="Project detail" detail="Select a project from the saved project list." /><section className="panel"><EmptyState title="No active project" detail="Project detail is unavailable until the runtime returns an active project context." /></section></>;
+  return <><PageHeading eyebrow="PROJECT CONTEXT" title={project.display.name} detail={project.display.code} /><section className="panel"><PanelHeading eyebrow="CONTEXTUAL WORKSPACE" title="RAB / EE" chip="READ PATH" /><p>RAB/EE is available only as a contextual workspace for this project. Global master-data and AHSP administration are not part of this slice.</p><div className="action-row"><a className="button-link" href={`/projects/${project.transport.projectId}/rab`}>Open RAB overview</a><a className="button-link secondary-button" href={`/projects/${project.transport.projectId}/rab/edit`}>Edit view shell</a><a className="button-link secondary-button" href={`/projects/${project.transport.projectId}/rab/export`}>Working Export view</a></div></section></>;
+}
+
 function Overview({ preview, code, name, workflow, onCreateProject }: { preview: ProjectPreview; code: string; name: string; workflow: OfficeWorkflowReadModel | null; onCreateProject: (project: { code: string; name: string }) => void }) {
   return <><PageHeading eyebrow="DELIVERY / PRESENTATION LAYER" title="Thin validation workspace" detail="Project context, one RAB workspace, runtime snapshots, validation, lifecycle, and working output." /><div className="overview-grid"><section className="panel" aria-labelledby="project-selection-title"><PanelHeading eyebrow="SAVED PROJECT DATA" title="Project selection" chip="RUNTIME" /><form className="project-form" method="get"><label htmlFor="project-code">Project code</label><input id="project-code" name="code" defaultValue={code} placeholder="Example: BRU-01" maxLength={20} required /><label htmlFor="project-name">Project name</label><input id="project-name" name="name" defaultValue={name} placeholder="Example: Kantor Camat" maxLength={120} required /><button type="submit">Validate preview</button></form>{preview === null && <EmptyState title="No preview yet" detail="Enter a project code and name to request an Application preview." />}{preview && preview.ok && <div className="success-state" role="status"><span className="severity-tag success">SUCCESS</span><h3>{preview.data.project.name}</h3><dl className="data-list"><div><dt>Code</dt><dd>{preview.data.project.code}</dd></div><div><dt>State</dt><dd>{preview.data.state}</dd></div></dl><p>Preview does not persist a project, context, execution, or audit record.</p><button type="button" onClick={() => onCreateProject(preview.data.project)}>Create saved project</button></div>}{preview && !preview.ok && <div className="error-state" role="alert"><span className="severity-tag error">ERROR</span><h3>Preview rejected</h3><p>{preview.message}</p></div>}</section><section className="panel"><PanelHeading eyebrow="ACTIVE CONTEXT" title="Saved projects" chip={workflow ? "LOADED" : "LOADING"} />{workflow && workflow.projects.length > 0 ? <ul className="data-list">{workflow.projects.map((project) => <li key={project.transport.projectId}><strong>{project.display.code}</strong><span>{project.display.name}{workflow.activeProject?.transport.projectId === project.transport.projectId ? " · active" : ""}</span></li>)}</ul> : <EmptyState title="No accessible saved project" detail="The selector becomes available when the runtime returns an accessible project." />}</section></div></>;
 }
 
-function RabWorkspace({ rab, activeProject, loading, onCreateDraft, onSubmitReview }: { rab: OfficeRabView | null; activeProject: OfficeWorkflowReadModel["activeProject"]; loading: boolean; onCreateDraft: () => void; onSubmitReview: () => void }) {
+function RabWorkspace({ rab, activeProject, loading, readOnly = false, onCreateDraft, onSubmitReview }: { rab: OfficeRabView | null; activeProject: OfficeWorkflowReadModel["activeProject"]; loading: boolean; readOnly?: boolean; onCreateDraft: () => void; onSubmitReview: () => void }) {
   if (!activeProject) return <><PageHeading eyebrow="RAB / EE" title="One RAB workspace" detail="Select a saved project before creating a RAB draft." /><section className="panel"><EmptyState title="Project context required" detail="No RAB command is offered until the runtime returns an active saved project." /></section></>;
-  if (!rab) return <><PageHeading eyebrow="RAB / EE" title="One RAB workspace" detail="The active project has no loaded RAB version." /><section className="panel"><PanelHeading eyebrow="SAVED PROJECT DATA" title="No RAB draft" chip="EMPTY" /><EmptyState title="No RAB selected" detail="Create one DRAFT through the Application workflow to load its saved state." /><button type="button" disabled={loading} onClick={onCreateDraft}>Create RAB DRAFT</button></section></>;
+  if (!rab) return <><PageHeading eyebrow="RAB / EE" title="One RAB workspace" detail="The active project has no loaded RAB version." /><section className="panel"><PanelHeading eyebrow="SAVED PROJECT DATA" title="No RAB draft" chip="EMPTY" /><EmptyState title="No RAB selected" detail={readOnly ? "No RAB read model was returned for this project." : "Create one DRAFT through the Application workflow to load its saved state."} />{!readOnly && <button type="button" disabled={loading} onClick={onCreateDraft}>Create RAB DRAFT</button>}</section></>;
 
   const canSubmitReview = rab.display.lifecycle === "DRAFT";
-  return <><PageHeading eyebrow="RAB / EE" title={rab.display.title} detail="Values below are read from the runtime response; the UI does not calculate RAB values." /><section className="panel"><div className="workspace-toolbar"><div><PanelHeading eyebrow="RAB SNAPSHOT" title={`Revision ${rab.display.revisionNumber}`} chip={rab.display.lifecycle} /><p className="muted">{rab.snapshot.available ? `Calculation snapshot returned at ${new Date(rab.snapshot.calculatedAt ?? "").toLocaleString()}.` : "No calculation snapshot has been returned for this saved DRAFT."}</p></div><div className="action-row"><button type="button" disabled={loading || !canSubmitReview} onClick={onSubmitReview}>Submit REVIEW</button></div></div><CalculationPreview rab={rab} /><ValidationPanel rab={rab} /></section></>;
+  return <><PageHeading eyebrow="RAB / EE" title={rab.display.title} detail="Values below are read from the runtime response; the UI does not calculate RAB values." /><section className="panel"><div className="workspace-toolbar"><div><PanelHeading eyebrow="RAB SNAPSHOT" title={`Revision ${rab.display.revisionNumber}`} chip={rab.display.lifecycle} /><p className="muted">{rab.snapshot.available ? `Calculation snapshot returned at ${new Date(rab.snapshot.calculatedAt ?? "").toLocaleString()}.` : "No calculation snapshot has been returned for this saved DRAFT."}</p></div>{!readOnly && <div className="action-row"><button type="button" disabled={loading || !canSubmitReview} onClick={onSubmitReview}>Submit REVIEW</button></div>}</div><CalculationPreview rab={rab} /><ValidationPanel rab={rab} /></section></>;
 }
 
 function CalculationPreview({ rab }: { rab: OfficeRabView }) {
@@ -164,13 +179,13 @@ function ValidationPanel({ rab }: { rab: OfficeRabView }) {
   return <section className="panel"><PanelHeading eyebrow="VALIDATION" title="Application evidence" chip={rab.validation.reviewBlocked ? "REVIEW BLOCKED" : "REVIEW READY"} />{issues.length === 0 ? <div className="success-state" role="status"><span className="severity-tag success">SUCCESS</span><p>No validation issue was returned by Application.</p></div> : <div className="action-stack">{issues.map((issue, index) => <Finding key={`${issue.severity}-${index}`} severity={issue.severity} detail={issue.message} reviewBlocked={rab.validation?.reviewBlocked ?? false} />)}</div>}</section>;
 }
 
-function ReviewWorkspace({ rab, role, projectId, onNotice }: { rab: OfficeRabView | null; role: Role; projectId: string | null; onNotice: (notice: Notice) => void }) {
+function ReviewWorkspace({ rab, role, projectId, readOnly = false, onNotice }: { rab: OfficeRabView | null; role: Role; projectId: string | null; readOnly?: boolean; onNotice: (notice: Notice) => void }) {
   if (!rab) return <><PageHeading eyebrow="REVIEW & EXPORT" title="Snapshot review" detail="A saved RAB version is required." /><section className="panel"><EmptyState title="No RAB snapshot loaded" detail="Create and submit a RAB to REVIEW to inspect Application validation and deterministic result evidence." /></section></>;
   const lifecycle = rab.display.lifecycle;
-  return <><PageHeading eyebrow="REVIEW & EXPORT" title="Snapshot review" detail="Lifecycle, validation, and calculation values are supplied by the runtime read model." /><section className="status-timeline" aria-label="Persisted lifecycle status"><span className={lifecycle === "DRAFT" ? "current" : "complete"}>DRAFT</span><i aria-hidden="true">→</i><span className={lifecycle === "REVIEW" ? "current" : lifecycle === "FINAL" ? "complete" : "pending"}>REVIEW</span><i aria-hidden="true">→</i><span className={lifecycle === "FINAL" ? "current" : "pending"}>FINAL</span></section><div className="review-grid"><section className="panel"><PanelHeading eyebrow="SNAPSHOT" title={rab.snapshot.available ? "Persisted calculation snapshot" : "No persisted calculation snapshot"} chip={rab.snapshot.available ? "AVAILABLE" : "PENDING"} /><p>{rab.snapshot.available ? "The current runtime response contains a deterministic snapshot for this RAB state." : "No snapshot is presented as acceptance data before Application returns it."}</p></section><section className="panel"><PanelHeading eyebrow="BASIC APPROVAL" title="Application-controlled review" chip={role} /><p>{lifecycle === "REVIEW" ? `REVIEW is persisted. Confirmed warning records returned: ${rab.approval.confirmedWarningCount}.` : lifecycle === "FINAL" ? "FINAL is read-only. Official Export is outside Phase 1A." : "Submit REVIEW is available from the RAB workspace after Application validation succeeds."}</p><p className="field-help">No approval, authorization, lifecycle, or validation decision is made in the browser.</p></section></div><ValidationPanel rab={rab} /><WorkingExportPanel role={role} lifecycle={lifecycle} projectId={projectId} rabVersionId={rab.transport.rabVersionId} onNotice={onNotice} /></>;
+  return <><PageHeading eyebrow="REVIEW & EXPORT" title="Snapshot review" detail="Lifecycle, validation, and calculation values are supplied by the runtime read model." /><section className="status-timeline" aria-label="Persisted lifecycle status"><span className={lifecycle === "DRAFT" ? "current" : "complete"}>DRAFT</span><i aria-hidden="true">→</i><span className={lifecycle === "REVIEW" ? "current" : lifecycle === "FINAL" ? "complete" : "pending"}>REVIEW</span><i aria-hidden="true">→</i><span className={lifecycle === "FINAL" ? "current" : "pending"}>FINAL</span></section><div className="review-grid"><section className="panel"><PanelHeading eyebrow="SNAPSHOT" title={rab.snapshot.available ? "Persisted calculation snapshot" : "No persisted calculation snapshot"} chip={rab.snapshot.available ? "AVAILABLE" : "PENDING"} /><p>{rab.snapshot.available ? "The current runtime response contains a deterministic snapshot for this RAB state." : "No snapshot is presented as acceptance data before Application returns it."}</p></section><section className="panel"><PanelHeading eyebrow="BASIC APPROVAL" title="Application-controlled review" chip={role} /><p>{lifecycle === "REVIEW" ? `REVIEW is persisted. Confirmed warning records returned: ${rab.approval.confirmedWarningCount}.` : lifecycle === "FINAL" ? "FINAL is read-only. Official Export is outside Phase 1A." : "Submit REVIEW is available from the RAB workspace after Application validation succeeds."}</p><p className="field-help">No approval, authorization, lifecycle, or validation decision is made in the browser.</p></section></div><ValidationPanel rab={rab} /><WorkingExportPanel role={role} lifecycle={lifecycle} projectId={projectId} rabVersionId={rab.transport.rabVersionId} readOnly={readOnly} onNotice={onNotice} /></>;
 }
 
-function WorkingExportPanel({ role, lifecycle, projectId, rabVersionId, onNotice }: { role: Role; lifecycle: OfficeRabView["display"]["lifecycle"]; projectId: string | null; rabVersionId: string; onNotice: (notice: Notice) => void }) {
+function WorkingExportPanel({ role, lifecycle, projectId, rabVersionId, readOnly = false, onNotice }: { role: Role; lifecycle: OfficeRabView["display"]["lifecycle"]; projectId: string | null; rabVersionId: string; readOnly?: boolean; onNotice: (notice: Notice) => void }) {
   const isBlocked = lifecycle === "FINAL" || projectId === null;
   const blockedReason = lifecycle === "FINAL" ? "Working Export is blocked because the runtime reports FINAL. This Phase 1A workspace supports DRAFT and REVIEW working output only." : "Working Export is blocked until an active saved project is returned by the runtime.";
   const requestWorkingExport = async () => {
@@ -196,7 +211,7 @@ function WorkingExportPanel({ role, lifecycle, projectId, rabVersionId, onNotice
     }
   };
 
-  return <section className="panel export-panel"><PanelHeading eyebrow="EXPORT WORKSPACE" title="Working output only" chip="PHASE 1A" /><div className="export-grid"><div><span className="severity-tag info">WORKING EXPORT · NOT OFFICIAL</span><p>Available only for DRAFT or REVIEW returned by Application.</p><button type="button" className="secondary-button" disabled={isBlocked} onClick={() => void requestWorkingExport()}>Export working Excel</button>{isBlocked && <p className="field-help" role="status">{blockedReason}</p>}</div><div><span className="severity-tag warning">OFFICIAL EXPORT</span><p>Official Export unavailable in Phase 1A. It is deliberately deferred and has no executable UI action.</p><button type="button" className="secondary-button" disabled aria-describedby="official-export-help">Official Export unavailable</button><p id="official-export-help" className="field-help">No official-output request is sent from this workspace.</p></div></div></section>;
+  return <section className="panel export-panel"><PanelHeading eyebrow="EXPORT WORKSPACE" title="Working output only" chip="PHASE 1A" /><div className="export-grid"><div><span className="severity-tag info">WORKING EXPORT · NOT OFFICIAL</span><p>Available only for DRAFT or REVIEW returned by Application.</p><button type="button" className="secondary-button" disabled={isBlocked || readOnly} onClick={() => void requestWorkingExport()}>Working Export {readOnly ? "held for delivery gate" : "view"}</button>{(isBlocked || readOnly) && <p className="field-help" role="status">{readOnly ? "This route is a non-executable view shell in tasks 1–4." : blockedReason}</p>}</div><div><span className="severity-tag warning">OFFICIAL EXPORT</span><p>Official Export unavailable in Phase 1A. It is deliberately deferred and has no executable UI action.</p><button type="button" className="secondary-button" disabled aria-describedby="official-export-help">Official Export unavailable</button><p id="official-export-help" className="field-help">No official-output request is sent from this workspace.</p></div></div></section>;
 }
 
 function Finding({ severity, detail, reviewBlocked }: { severity: "ERROR" | "WARNING" | "INFO"; detail: string; reviewBlocked: boolean }) {
